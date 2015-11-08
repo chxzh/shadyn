@@ -1,8 +1,11 @@
 import glfw
 import atb
+from app import Application
 from OpenGL.GL import *
 def main():
-    basic_glfw_example()
+    
+    app = Application()
+    app.run()
     print "end of main"
     return
 

@@ -1,3 +1,4 @@
 glfw3.dll
 AntTweakBar64.dll
 AntTweakBar.dll
+*.pyc
