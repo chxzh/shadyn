@@ -1,11 +1,8 @@
-'''import glfw
+import glfw
 import atb
 from app import Application
-from OpenGL.GL import *'''
+from OpenGL.GL import *
 def main():
-    print "haha"
-    return
-'''
     app = Application()
     app.run()
     print "end of main"
@@ -31,6 +28,6 @@ def basic_glfw_example():
         # Poll for and process events
         glfw.poll_events()
     glfw.terminate();
-'''
+
 if __name__ == "__main__":
     main()
