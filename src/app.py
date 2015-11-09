@@ -66,3 +66,5 @@ class Item:
     def __init__(self):
         return
 
+class OBJ:
+    pass
