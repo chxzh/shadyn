@@ -20,11 +20,11 @@ class Loader(object):
                 texcoords.append(tuple(map(float, values[1:3])))
             elif values[0] == 'f':
                 face = []
-            for v in values[1:]:
-                w = map(lambda x: int(x) if x else None, v.split('/'))
-                w = map(lambda x: x - 1 if x != None and x > 0 else x, w)
-                face.append(tuple(w))
-            faces.append(tuple(face))
+                for v in values[1:]:
+                    w = map(lambda x: int(x) if x else None, v.split('/'))
+                    w = map(lambda x: x - 1 if x != None and x > 0 else x, w)
+                    face.append(tuple(w))
+                faces.append(tuple(face))
         # save result
         self.vertices = vertices
         self.normals = normals
