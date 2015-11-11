@@ -70,8 +70,16 @@ class Scene:
 
 
 class Camera:
-    def __init__(self):
+    def __init__(self,
+                 position=vec3(0.),
+                 target=vec3(0., 0., -1.),
+                 up=vec3(0.,1.,0.),
+                 static=False):
+        self.position = position
+        self.target = target
+        self.view_matrix = mat4.lookAt(position, target, up)
         pass
+    
 
 
 class Item:
