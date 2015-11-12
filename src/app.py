@@ -2,6 +2,7 @@ import numpy as np
 import glfw
 from OpenGL.GL import *
 from cgkit.cgtypes import *
+import math
 
 class Application:
     def __init__(self):
@@ -74,10 +75,15 @@ class Camera:
                  position=vec3(0.),
                  target=vec3(0., 0., -1.),
                  up=vec3(0.,1.,0.),
+                 projection_matrix=None,
                  static=False):
         self.position = position
         self.target = target
         self.view_matrix = mat4.lookAt(position, target, up)
+        self.projection_matrix = projection_matrix\
+            if not projection_matrix == None\
+            else mat4.perspective(math.radians(45),4./3,0.1,100)
+        
         pass
     
 
@@ -115,14 +121,21 @@ class Item:
 
 
 class Object:
-    def __init__(self, path):
-        vertices = []
-        normals = []
-        texcoords = []
-        faces = []
-        attrib_map = {'v': (vertices,3),
-                     'vn': (normals, 3),
-                     'vt': (texcoords, 2)}
+    def __init__(self, path=None):
+        self.vertices = []
+        self.normals = []
+        self.texcoords = []
+        self.faces = []
+        self.v_indice = []
+        self.t_indice = []
+        self.n_indice = []
+        # if the path is not provided, presumably attributes will be filled in
+        # afterward
+        if path == None:
+            return
+        attrib_map = {'v': (self.vertices,3),
+                     'vn': (self.normals, 3),
+                     'vt': (self.texcoords, 2)}
         with open(path, 'r') as obj_file:
             for line in obj_file:
                 if line.startswith('#'): continue
@@ -133,14 +146,25 @@ class Object:
                     attrib.append(tuple(map(float, values[1:1+length])))
                 elif values[0] == 'f':
                     face = []
-                    for v in values[1:]:
-                        w = map(lambda x: int(x) if x else None, v.split('/'))
+                    for value in values[1:]:
+                        w = map(lambda x: int(x) if x else None, value.split('/'))
+                        # convert from 1-based to 0-based
                         w = map(lambda x: x - 1 if x != None and x > 0 else x, w)
+                        # fill the values into corresponding list
+                        # TODO: decide what should be filled in for missing value
+                        # (which is None currently filled in)
+                        v, vt, vn = tuple(w)
+                        self.v_indice.append(v)
+                        self.t_indice.append(vt)
+                        self.n_indice.append(vn)
                         face.append(tuple(w))
-                    faces.append(tuple(face))
-        # save result
-        self.vertices = vertices
-        self.normals = normals
-        self.texcoords = texcoords
-        self.faces = faces
-        pass
+                    self.faces.append(tuple(face))
+        return
+    
+def _main():
+    pass
+
+if __name__ == "__main__":
+    print "---starting main()---"
+    _main()
+    print "---end of main()---"
