@@ -125,41 +125,85 @@ class Object:
         self.vertices = []
         self.normals = []
         self.texcoords = []
-        self.faces = []
-        self.v_indice = []
-        self.t_indice = []
-        self.n_indice = []
+        self.indices = []
         # if the path is not provided, presumably attributes will be filled in
         # afterward
         if path == None:
             return
-        attrib_map = {'v': (self.vertices,3),
-                     'vn': (self.normals, 3),
-                     'vt': (self.texcoords, 2)}
+        else: self.load_from_file(path)
+        return
+    
+    def load_from_file(self, path=None):
+        vertices = []
+        normals = []
+        texcoords = []
+        faces = []
+#         attrib_map = {'v': vertices,
+#                      'vn': normals,
+#                      'vt': texcoords}
+        append = lambda attrib: lambda line: attrib.append(tuple(map(float, values[1:])))
+        ignore = lambda values: None
+        def handle_face(values):
+            for value in line.split()[1:]:
+                # presuming having no negative value
+                # converting from 1-base to 0-base
+                v = map(lambda x: int(x)-1 if x else None, value.split('/'))
+                # presuming drawing triangles only
+                faces.append(tuple(v))
+        attrib_handle_map = {
+                    '#': ignore,    # a comment line
+                    '': ignore,     # an empty line
+                    'v': append(vertices),
+                    'vn': append(normals),
+                    'vt': append(texcoords),
+                    'f': handle_face
+                    }
+        # read in from file 
         with open(path, 'r') as obj_file:
             for line in obj_file:
-                if line.startswith('#'): continue
+                line = line.strip()                
+                if line.startswith('#'): continue # a comment line
                 values = line.split()
-                if not values: continue
-                if values[0] in attrib_map:
-                    attrib, length = attrib_map[values[0]]
-                    attrib.append(tuple(map(float, values[1:1+length])))
-                elif values[0] == 'f':
-                    face = []
-                    for value in values[1:]:
-                        w = map(lambda x: int(x) if x else None, value.split('/'))
-                        # convert from 1-based to 0-based
-                        w = map(lambda x: x - 1 if x != None and x > 0 else x, w)
-                        # fill the values into corresponding list
-                        # TODO: decide what should be filled in for missing value
-                        # (which is None currently filled in)
-                        v, vt, vn = tuple(w)
-                        self.v_indice.append(v)
-                        self.t_indice.append(vt)
-                        self.n_indice.append(vn)
-                        face.append(tuple(w))
-                    self.faces.append(tuple(face))
-        return
+                try:
+                    operation = attrib_handle_map[values[0]]
+                    operation(values)
+                except KeyError:
+                    pass # ignore undefined
+#                 # deprecated
+#                 if not values: continue # empty line
+#                 if values[0] in attrib_map:
+#                     attribute = attrib_map[values[0]]
+#                     attribute.append(tuple(map(float, values[1:])))
+#                 elif values[0] == 'f':
+#                     for value in values[1:]:
+#                         # presuming having no negative value
+#                         # converting from 1-base to 0-base
+#                         v = map(lambda x: int(x)-1 if x else None, value.split('/'))
+#                         # presuming drawing triangles only
+#                         faces.append(tuple(v))
+        # indexing to compromise for VBO single index design
+        vertex_pack_map = {}
+        self.indices = []
+        self.vertices = []
+        self.normals = []
+        self.texcoords = []
+        for element in faces:
+            try:
+                # query for the v-vt-vn indices tuple
+                index = vertex_pack_map[element]
+            except KeyError:
+                # this v-vt-vn pack is not in the dict
+                index = len(vertex_pack_map)
+                v, vt, vn = element
+                vertex_pack_map[element] = index
+                self.vertices.append(vertices[v])
+                self.texcoords.append(texcoords[vt])
+                self.normals.append(normals[vn])
+            finally:                
+                # by here, element is recorded in the dict
+                self.indices.append(index)
+        return            
+    
     
 def _main():
     pass
