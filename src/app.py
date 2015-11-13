@@ -164,6 +164,7 @@ class Object:
                 line = line.strip()                
                 if line.startswith('#'): continue # a comment line
                 values = line.split()
+                if not values: continue # empty line
                 try:
                     operation = attrib_handle_map[values[0]]
                     operation(values)
@@ -187,7 +188,7 @@ class Object:
         self.vertices = []
         self.normals = []
         self.texcoords = []
-        for element in faces:
+        for element in self.faces:
             try:
                 # query for the v-vt-vn indices tuple
                 index = vertex_pack_map[element]
@@ -196,9 +197,15 @@ class Object:
                 index = len(vertex_pack_map)
                 v, vt, vn = element
                 vertex_pack_map[element] = index
-                self.vertices.append(vertices[v])
-                self.texcoords.append(texcoords[vt])
-                self.normals.append(normals[vn])
+                for attr_indexed_list, attr_index, attr_list in [
+                        (self.vertices, v, vertices),
+                        (self.texcoords, vt, texcoords),
+                        (self.normals, vn, normals)]:
+                    value = attr_list[attr_index] if attr_index != None else None
+                    attr_indexed_list.append(value)
+#                 if v: self.vertices.append(vertices[v])
+#                 if vt: self.texcoords.append(texcoords[vt])
+#                 if vn: self.normals.append(normals[vn])
             finally:                
                 # by here, element is recorded in the dict
                 self.indices.append(index)
