@@ -188,7 +188,7 @@ class Object:
         self.vertices = []
         self.normals = []
         self.texcoords = []
-        for element in self.faces:
+        for element in faces:
             try:
                 # query for the v-vt-vn indices tuple
                 index = vertex_pack_map[element]
