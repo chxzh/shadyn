@@ -4,13 +4,12 @@ import tools
 from app import Application, Object
 from OpenGL.GL import *
 from ctypes import c_uint8, c_float, c_ushort, c_void_p
-from OpenGL.raw.GL.VERSION.GL_1_5 import GL_ARRAY_BUFFER
 from math import pi
 from cgkit.cgtypes import *
 from OpenGL.raw.GL.ARB.vertex_buffer_object import GL_ARRAY_BUFFER_ARB
 def _main():
-    draw_a_triangle()
-#     draw_a_cube()
+#     draw_a_triangle()
+    draw_a_cube()
     return
 
 def draw_a_cube():
@@ -26,9 +25,9 @@ def draw_a_cube():
     glfw.make_context_current(window)
     # Loop until the user closes the window
     glClearColor(0.0, 0.0, 0.2, 1.0)
-    program_handle = tools.load_program("shader/cube.v.glsl", "shader/cube.f.glsl")
+    program_handle = tools.load_program("../shader/cube.v.glsl", "../shader/cube.f.glsl")
     glUseProgram(program_handle)
-    cube_obj = Object("obj/cube.obj")
+    cube_obj = Object("../obj/cube.obj")
     
     # initialize VAO
     vao_handle = glGenVertexArrays(1)
@@ -57,12 +56,14 @@ def draw_a_cube():
                  GL_STATIC_DRAW)
     
     # attributes initializing
-    
+    glEnableVertexAttribArray(1)
+    glBindBuffer(GL_ARRAY_BUFFER, v_buffer)
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, None)
     # uniforms    
     c_mat4 = lambda mat4: (c_float * 16)(*(mat4.toList()))
     model_mat = mat4(1.0)
     model_mat.rotate(pi / 3, vec3(1.0, 1.0, 0))
-    view_mat = mat4.lookAt(vec3(0, 0, -5),
+    view_mat = mat4.lookAt(vec3(0, 0, -50),
                            vec3(0, 0, 0))
     proj_mat = mat4.perspective(pi / 4, 4. / 3, 0.1, 100)
     mvp = proj_mat * view_mat * model_mat
@@ -81,9 +82,6 @@ def draw_a_cube():
         # Swap front and back buffers 
         
         # bind buffer to vao
-        glEnableVertexAttribArray(0)
-        glBindBuffer(GL_ARRAY_BUFFER, v_buffer)
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, 0)
 #         glEnableVertexAttribArray(n_buffer)
 #         glBindBuffer(GL_ARRAY_BUFFER, n_buffer)
 #         glVertexAttribPointer(v_buffer, 3, GL_FLOAT, GL_FALSE, 0, 0)
@@ -91,7 +89,7 @@ def draw_a_cube():
         
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, i_buffer)
         glDrawElements(GL_TRIANGLES, len(cube_obj.indices),
-                        GL_UNSIGNED_SHORT, c_void_p(0));
+                        GL_UNSIGNED_SHORT, None);
 
         glfw.swap_buffers(window)
         # Poll for and process events
@@ -126,26 +124,25 @@ def draw_a_triangle():
     indices = range(3)
     vao_handle = glGenVertexArrays(1)
     glBindVertexArray(vao_handle)
-    program_handle = tools.load_program("shader/simple.v.glsl",
-                                        "shader/simple.f.glsl")
+    program_handle = tools.load_program("../shader/simple.v.glsl",
+                                        "../shader/simple.f.glsl")
     
     f_vertices = flatten(vertices)
     c_vertices = (c_float*len(f_vertices))(*f_vertices)
     v_buffer = glGenBuffers(1)
     glBindBuffer(GL_ARRAY_BUFFER, v_buffer)
     glBufferData(GL_ARRAY_BUFFER, c_vertices, GL_STATIC_DRAW)
-
+    glEnableVertexAttribArray(0)
+    glBindBuffer(GL_ARRAY_BUFFER, v_buffer)
+    glVertexAttribPointer(0,
+        #glGetAttribLocation(program_handle, "vertexPosition_modelspace"),
+        3, GL_FLOAT, False, 0, None)
     
     # Loop until the user closes the window
     while not glfw.window_should_close(window):
         # Render here
         glClear(GL_COLOR_BUFFER_BIT)
         glUseProgram(program_handle)
-        glEnableVertexAttribArray(vao_handle)
-        glBindBuffer(GL_ARRAY_BUFFER, v_buffer)
-        glVertexAttribPointer(0,
-            #glGetAttribLocation(program_handle, "vertexPosition_modelspace"),
-            3, GL_FLOAT, False, 0, 0)
         
         glDrawArrays(GL_TRIANGLES, 0, 3)
         glDisableVertexAttribArray(vao_handle)

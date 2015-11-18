@@ -18,6 +18,7 @@ def load_program(vert_shader_path, frag_shader_path):
     shader_list = []
     for src_path, shader_type in shader_paths:
         with open(src_path) as src_file:
+            print src_path
             src = ""
             for line in src_file.readlines():
                 src += line
