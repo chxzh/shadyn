@@ -7,7 +7,7 @@ from ctypes import c_uint8, c_float, c_ushort, c_void_p
 from math import pi
 from cgkit.cgtypes import *
 from OpenGL.raw.GL.ARB.vertex_buffer_object import GL_ARRAY_BUFFER_ARB
-from numpy import array
+
 def _main():
     draw_a_few_cubes()
     return
@@ -19,16 +19,16 @@ def draw_a_few_cubes():
         return -1;
     # Create a windowed mode window and its OpenGL context
     window = glfw.create_window(640, 480, "scene", None, None);
-    window2 = glfw.create_window(640, 480, "floor", None, None);
+#     window2 = glfw.create_window(640, 480, "floor", None, None);
     if window == None:
         glfw.terminate()
         return -1
     # Loop until the user closes the window
     glfw.make_context_current(window)
     glClearColor(0.0, 0.0, 0.2, 1.0)
-    glfw.make_context_current(window2)
-    glClearColor(0.0, 0.2, 0.2, 1.0)    
-    glfw.make_context_current(window)
+#     glfw.make_context_current(window2)
+#     glClearColor(0.0, 0.2, 0.2, 1.0)    
+#     glfw.make_context_current(window)
     program_handle = tools.load_program("../shader/StandardShading.v.glsl", "../shader/StandardShading.f.glsl")
     glUseProgram(program_handle)
     cube_obj = Object("../obj/cube.obj")
@@ -73,24 +73,26 @@ def draw_a_few_cubes():
     c_mat4 = lambda mat4: (c_float * 16)(*(mat4.toList()))
     model_mat = mat4(1.0)
     model_mat.scale(vec3(0.5))
-    model_mat.rotate(pi / 3, vec3(1.0, 1.0, 0))
+    model_mat.rotate(pi / 6, vec3(0.0, 1.0, 0.0))
     model_mat.translate((0.5, 0, 0))
     view_mat = mat4.lookAt(vec3(0, 0, -5),
-                           vec3(0, 0, 0))
+                           vec3(0, 0, 0),
+                           vec3(0, 1, 0))
     proj_mat = mat4.perspective(45, 4./3, 0.1, 100)
     model_view_inv = (view_mat * model_mat).inverse()
-    light_pos = vec3(5,5,5)
+    light_pos = vec3(3,3,3)
     MVP = proj_mat * view_mat * model_mat
-    MVP_loc = glGetUniformLocation(program_handle, "MVP")
-    glUniformMatrix4fv(MVP_loc, 1, GL_FALSE, MVP.toList())
     V_loc = glGetUniformLocation(program_handle, "V")
     glUniformMatrix4fv(V_loc, 1, GL_FALSE, view_mat.toList())
-    M_loc = glGetUniformLocation(program_handle, "M")
-    glUniformMatrix4fv(M_loc, 1, GL_FALSE, model_mat.toList())
     light_pos_loc = glGetUniformLocation(program_handle, "LightPosition_worldspace")
     glUniform3f(light_pos_loc, light_pos.x, light_pos.y, light_pos.z)
+    MVP_loc = glGetUniformLocation(program_handle, "MVP")
+    M_loc = glGetUniformLocation(program_handle, "M")
     MVint_loc = glGetUniformLocation(program_handle, "MVint")
-    glUniformMatrix4fv(MVint_loc, 1, GL_TRUE, model_view_inv.toList())
+    
+    floor_model_mat = mat4.translation((0,-2,0))*mat4.scaling((5,1,5))
+    floor_MVP = proj_mat*view_mat*floor_model_mat
+    floor_MVinv = (view_mat*floor_model_mat).inverse()
     
     
     light_pos  = vec3(3,3,3)
@@ -100,12 +102,11 @@ def draw_a_few_cubes():
     glEnable(GL_DEPTH_TEST)
     glDepthFunc(GL_LESS)
     
-    while not glfw.window_should_close(window) and not glfw.window_should_close(window2):
+    while not glfw.window_should_close(window):
         # Render here
         # Make the window's context current
         glfw.make_context_current(window)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-        # Swap front and back buffers 
         
         # bind buffer to vao
 #         glEnableVertexAttribArray(n_buffer)
@@ -113,16 +114,27 @@ def draw_a_few_cubes():
 #         glVertexAttribPointer(v_buffer, 3, GL_FLOAT, GL_FALSE, 0, 0)
           
         
+        glUniformMatrix4fv(MVint_loc, 1, GL_TRUE, model_view_inv.toList())
+        glUniformMatrix4fv(M_loc, 1, GL_FALSE, model_mat.toList())
+        glUniformMatrix4fv(MVP_loc, 1, GL_FALSE, MVP.toList())
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, i_buffer)
         glDrawElements(GL_TRIANGLES, len(cube_obj.indices),
                         GL_UNSIGNED_SHORT, None);
-                        
+        
+        glUniformMatrix4fv(MVint_loc, 1, GL_TRUE, floor_MVinv.toList())
+        glUniformMatrix4fv(M_loc, 1, GL_FALSE, floor_model_mat.toList())
+        glUniformMatrix4fv(MVP_loc, 1, GL_FALSE, floor_MVP.toList())                        
+        glDrawElements(GL_TRIANGLES, len(cube_obj.indices),
+                        GL_UNSIGNED_SHORT, None);
+        
+        # Swap front and back buffers 
         glfw.swap_buffers(window)
         
-        glfw.make_context_current(window2)
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+#         glfw.make_context_current(window2)
+#         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+#         
+#         glfw.swap_buffers(window2)        
         
-        glfw.swap_buffers(window2)        
         # Poll for and process events
         glfw.poll_events()
     glfw.terminate();
@@ -134,7 +146,7 @@ def draw_a_white_cube():
     if not glfw.init():
         return -1;
     # Create a windowed mode window and its OpenGL context
-    window = glfw.create_window(640, 480, "Hello World", None, None);
+    window = glfw.create_window(640, 480, "white cube", None, None);
     if window == None:
         glfw.terminate()
         return -1
