@@ -29,7 +29,7 @@ def draw_a_few_cubes():
     glfw.make_context_current(window2)
     glClearColor(0.0, 0.2, 0.2, 1.0)    
     glfw.make_context_current(window)
-    program_handle = tools.load_program("../shader/cube.v.glsl", "../shader/cube.f.glsl")
+    program_handle = tools.load_program("../shader/StandardShading.v.glsl", "../shader/StandardShading.f.glsl")
     glUseProgram(program_handle)
     cube_obj = Object("../obj/cube.obj")
     
@@ -60,9 +60,15 @@ def draw_a_few_cubes():
                  GL_STATIC_DRAW)
     
     # attributes initializing
-    glEnableVertexAttribArray(1)
+    vert_loc = glGetAttribLocation(program_handle, "vertexPosition_modelspace")
+    glEnableVertexAttribArray(vert_loc)
     glBindBuffer(GL_ARRAY_BUFFER, v_buffer)
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, None)
+    glVertexAttribPointer(vert_loc, 3, GL_FLOAT, GL_FALSE, 0, None)
+    norm_loc = glGetAttribLocation(program_handle, "vertexNormal_modelspace")
+    glEnableVertexAttribArray(norm_loc)
+    glBindBuffer(GL_ARRAY_BUFFER, n_buffer)
+    glVertexAttribPointer(norm_loc, 3, GL_FLOAT, GL_FALSE, 0, None)
+    
     # uniforms    
     c_mat4 = lambda mat4: (c_float * 16)(*(mat4.toList()))
     model_mat = mat4(1.0)
@@ -72,10 +78,20 @@ def draw_a_few_cubes():
     view_mat = mat4.lookAt(vec3(0, 0, -5),
                            vec3(0, 0, 0))
     proj_mat = mat4.perspective(45, 4./3, 0.1, 100)
-    mvp = proj_mat * view_mat * model_mat
-    c_mvp = c_mat4(mvp)
-    mvp_id = glGetUniformLocation(program_handle, "mvp")
-    glUniformMatrix4fv(mvp_id, 1, GL_FALSE, mvp.toList())
+    model_view_inv = (view_mat * model_mat).inverse()
+    light_pos = vec3(5,5,5)
+    MVP = proj_mat * view_mat * model_mat
+    MVP_loc = glGetUniformLocation(program_handle, "MVP")
+    glUniformMatrix4fv(MVP_loc, 1, GL_FALSE, MVP.toList())
+    V_loc = glGetUniformLocation(program_handle, "V")
+    glUniformMatrix4fv(V_loc, 1, GL_FALSE, view_mat.toList())
+    M_loc = glGetUniformLocation(program_handle, "M")
+    glUniformMatrix4fv(M_loc, 1, GL_FALSE, model_mat.toList())
+    light_pos_loc = glGetUniformLocation(program_handle, "LightPosition_worldspace")
+    glUniform3f(light_pos_loc, light_pos.x, light_pos.y, light_pos.z)
+    MVint_loc = glGetUniformLocation(program_handle, "MVint")
+    glUniformMatrix4fv(MVint_loc, 1, GL_TRUE, model_view_inv.toList())
+    
     
     light_pos  = vec3(3,3,3)
     
