@@ -62,10 +62,12 @@ def draw_a_cube():
     # uniforms    
     c_mat4 = lambda mat4: (c_float * 16)(*(mat4.toList()))
     model_mat = mat4(1.0)
+    model_mat.scale(vec3(0.5))
     model_mat.rotate(pi / 3, vec3(1.0, 1.0, 0))
-    view_mat = mat4.lookAt(vec3(0, 0, -50),
+    model_mat.translate((0.5, 0, 0))
+    view_mat = mat4.lookAt(vec3(0, 0, -5),
                            vec3(0, 0, 0))
-    proj_mat = mat4.perspective(pi / 4, 4. / 3, 0.1, 100)
+    proj_mat = mat4.perspective(45, 4./3, 0.1, 100)
     mvp = proj_mat * view_mat * model_mat
     c_mvp = c_mat4(mvp)
     mvp_id = glGetUniformLocation(program_handle, "mvp")
