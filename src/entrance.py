@@ -14,7 +14,7 @@ def _main():
     draw_a_few_cubes()
     return
 
-def draw_a_few_cubes():    
+def draw_projected_shadows():    
     flatten = lambda l: [u for t in l for u in t]
     c_array = lambda c_type: lambda l: (c_type*len(l))(*l)
     if not glfw.init():
@@ -106,9 +106,242 @@ def draw_a_few_cubes():
     glUniformMatrix4fv(bias_loc, 1, GL_FALSE, flatten_biasmat)
     shadow_map_loc = glGetUniformLocation(program_handle, "shadowMap")
     
+    # initializing other stuff
+    glEnable(GL_DEPTH_TEST)
+    glDepthFunc(GL_LESS)
+    glEnable(GL_CULL_FACE)
     
+    # initializing shadow mapping
+    depth_program_handle = tools.load_program("../shader/DepthRTT.v.glsl",
+                                              "../shader/DepthRTT.f.glsl")
+    depth_MVP_loc = glGetUniformLocation(depth_program_handle, "depthMVP")
+    depth_framebuffer = glGenFramebuffers(1)
+    glBindFramebuffer(GL_FRAMEBUFFER, depth_framebuffer)
+    depth_tex = glGenTextures(1)
+    glBindTexture(GL_TEXTURE_2D, depth_tex)
+    glTexImage2D(GL_TEXTURE_2D, # target
+                 0,             # level
+                 GL_DEPTH_COMPONENT16,  # internal format
+                 1024,          # width
+                 1024,          # height
+                 0,             # border
+                 GL_DEPTH_COMPONENT,     # format
+                 GL_FLOAT,      # type
+                 None)          # data pointer
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_R_TO_TEXTURE);    
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, depth_tex, 0)
+    glDrawBuffer(GL_NONE)
+    if glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE:
+        raise RuntimeError("framebuffer is not okay")
+    depth_proj_mat = mat4.perspective(45, 1, 1, 50)
+    depth_view_mat = mat4.lookAt(light_pos, vec3(0), vec3(0,1,0))
+    glUseProgram(depth_program_handle)
+    depth_vert_loc = glGetAttribLocation(depth_program_handle, 
+                                         "vertexPosition_modelspace")
+    glEnableVertexAttribArray(depth_vert_loc)
+    glBindBuffer(GL_ARRAY_BUFFER, v_buffer)
+    print "vertices buffer handle:", v_buffer
+    glVertexAttribPointer(depth_vert_loc,   # attribute handle                          
+                          3,                # size
+                          GL_FLOAT,         # type
+                          GL_FALSE,         # unnormalized
+                          0,                # stride
+                          None              # array buffer offset
+                          )
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, i_buffer)
     
+    # initialize the texture monitor
+    quad_vertices = [   -1.0, -1.0, 0.0,   1.0, -1.0, 0.0,   -1.0,  1.0, 0.0,\
+                        -1.0,  1.0, 0.0,   1.0, -1.0, 0.0,    1.0,  1.0, 0.0]
+    quad_v_buffer = glGenBuffers(1)
+    glBindBuffer(GL_ARRAY_BUFFER, quad_v_buffer)
+    glBufferData(GL_ARRAY_BUFFER, (c_float*(len(quad_vertices)))(*quad_vertices), GL_STATIC_DRAW)
+    quad_program_handle = tools.load_program("../shader/Passthrough.v.glsl",
+                                             "../shader/SimpleTexture.f.glsl")
+    tex_loc = glGetUniformLocation(quad_program_handle, "texture");
+
+    while not glfw.window_should_close(window):
+        # Render here
+        # Make the window's context current
+        glfw.make_context_current(window)
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        
+        # draw the shadow map
+        glBindFramebuffer(GL_FRAMEBUFFER, depth_framebuffer)
+        glViewport(0,0,1024,1024)
+        # TODO: see if the coming lines can be moved outside
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK)
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        glUseProgram(depth_program_handle)
+        depth_MVP = depth_proj_mat * depth_view_mat * model_mat
+        glUniformMatrix4fv(depth_MVP_loc, 1, GL_FALSE, depth_MVP.toList())
+        
+        glEnableVertexAttribArray(depth_vert_loc)
+        glBindBuffer(GL_ARRAY_BUFFER, v_buffer)
+        glVertexAttribPointer(depth_vert_loc,   # attribute handle
+                              3,                # size
+                              GL_FLOAT,         # type
+                              GL_FALSE,         # unnormalized
+                              0,                # stride
+                              None              # array buffer offset
+                              )
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, i_buffer)
+        glDrawElements(GL_TRIANGLES, len(cube_obj.indices),
+                        GL_UNSIGNED_SHORT, None)
+        
+        
+        # draw the scene          
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glViewport(0,0,640,480)
+        glUseProgram(program_handle)        
+        glActiveTexture(GL_TEXTURE0)
+        glBindTexture(GL_TEXTURE_2D, depth_tex)
+        glUniform1i(shadow_map_loc, 0)
+        glUniformMatrix4fv(MVint_loc, 1, GL_TRUE, model_view_inv.toList())
+        glUniformMatrix4fv(M_loc, 1, GL_FALSE, model_mat.toList())
+        glUniformMatrix4fv(MVP_loc, 1, GL_FALSE, MVP.toList())
+        glDrawElements(GL_TRIANGLES, len(cube_obj.indices),
+                        GL_UNSIGNED_SHORT, None);        
+        glUniformMatrix4fv(MVint_loc, 1, GL_TRUE, floor_MVinv.toList())
+        glUniformMatrix4fv(M_loc, 1, GL_FALSE, floor_model_mat.toList())
+        glUniformMatrix4fv(MVP_loc, 1, GL_FALSE, floor_MVP.toList())                        
+        glDrawElements(GL_TRIANGLES, len(cube_obj.indices),
+                        GL_UNSIGNED_SHORT, None)
+        
+        # texture monitor
+        glViewport(0, 0, 256, 256)
+        glUseProgram(quad_program_handle)
+        # Bind our texture in Texture Unit 0
+        glActiveTexture(GL_TEXTURE0)
+        glBindTexture(GL_TEXTURE_2D, depth_tex)
+        # Set our "renderedTexture" sampler to user Texture Unit 0
+        glUniform1i(tex_loc, 0)
+        # 1rst attribute buffer : vertices
+        glEnableVertexAttribArray(0)
+        glBindBuffer(GL_ARRAY_BUFFER, quad_v_buffer)
+        glVertexAttribPointer(
+            0,                  # attribute 0. No particular reason for 0, but must match the layout in the shader.
+            3,                  # size
+            GL_FLOAT,           # type
+            GL_FALSE,           # normalized?
+            0,                  # stride
+            None            # array buffer offset
+            )
+        # Draw the triangle !
+        # You have to disable GL_COMPARE_R_TO_TEXTURE above in order to see anything !
+        glDrawArrays(GL_TRIANGLES, 0, 6) # 2*3 indices starting at 0 -> 2 triangles
+        glDisableVertexAttribArray(0)
+        # Swap front and back buffers 
+        glfw.swap_buffers(window)
+        
+#         glfw.make_context_current(window2)
+#         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+#         
+#         glfw.swap_buffers(window2)        
+        
+        # Poll for and process events
+        glfw.poll_events()
+    glfw.terminate();
+    pass
+
+def draw_a_few_cubes():    
+    flatten = lambda l: [u for t in l for u in t]
+    c_array = lambda c_type: lambda l: (c_type*len(l))(*l)
+    if not glfw.init():
+        return -1;
+    # Create a windowed mode window and its OpenGL context
+    window = glfw.create_window(640, 480, "scene", None, None);
+#     window2 = glfw.create_window(640, 480, "floor", None, None);
+    if window == None:
+        glfw.terminate()
+        return -1
+    # Loop until the user closes the window
+    glfw.make_context_current(window)
+    glClearColor(0.0, 0.0, 0.2, 1.0)
+#     glfw.make_context_current(window2)
+#     glClearColor(0.0, 0.2, 0.2, 1.0)    
+#     glfw.make_context_current(window)
+    program_handle = tools.load_program("../shader/flatShading.v.glsl",
+                                        "../shader/flatShading.f.glsl")
+    glUseProgram(program_handle)
+    cube_obj = Object("../obj/cube.obj")
     
+    # initialize VAO
+    vao_handle = glGenVertexArrays(1)
+    glBindVertexArray(vao_handle)
+    
+    # bind buffers
+    # indices buffer
+    i_buffer = glGenBuffers(1)
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, i_buffer)
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+                 (c_ushort * len(cube_obj.indices))(*cube_obj.indices),
+                 GL_STATIC_DRAW)
+    # vertices buffer
+    v_buffer = glGenBuffers(1)
+    glBindBuffer(GL_ARRAY_BUFFER, v_buffer)
+    v_flatten = flatten(cube_obj.vertices)
+    glBufferData(GL_ARRAY_BUFFER,
+                 (c_float * len(v_flatten))(*v_flatten),
+                 GL_STATIC_DRAW)
+    # normals buffer
+    n_buffer = glGenBuffers(1)
+    glBindBuffer(GL_ARRAY_BUFFER, n_buffer)
+    n_flatten = flatten(cube_obj.normals)
+    glBufferData(GL_ARRAY_BUFFER,
+                 (c_float * len(n_flatten))(*n_flatten),
+                 GL_STATIC_DRAW)
+    
+    # attributes initializing
+    vert_loc = glGetAttribLocation(program_handle, "vertexPosition_modelspace")
+    glEnableVertexAttribArray(vert_loc)
+    glBindBuffer(GL_ARRAY_BUFFER, v_buffer)
+    glVertexAttribPointer(vert_loc, 3, GL_FLOAT, GL_FALSE, 0, None)
+    # TODO: fix the existing attribute unable to retrieve problem
+    norm_loc = 0# glGetAttribLocation(program_handle, "vertexNormal_modelspace")
+    glEnableVertexAttribArray(norm_loc)
+    glBindBuffer(GL_ARRAY_BUFFER, n_buffer)
+    glVertexAttribPointer(norm_loc, 3, GL_FLOAT, GL_FALSE, 0, None)
+    
+    # uniforms    
+    model_mat = mat4(1.0)
+    model_mat.scale(vec3(0.5))
+    model_mat.rotate(pi / 2, vec3(1.0, 0.5, 1.7))
+    model_mat.translate((0.5, 0, 0))
+    view_mat = mat4.lookAt(vec3(0, 0, -5),
+                           vec3(0, 0, 0),
+                           vec3(0, 1, 0))
+    proj_mat = mat4.perspective(45, 4./3, 0.1, 100)
+    model_view_inv = (view_mat * model_mat).inverse()
+    light_pos = vec3(3,3,3)
+    MVP = proj_mat * view_mat * model_mat
+    V_loc = glGetUniformLocation(program_handle, "V")
+    glUniformMatrix4fv(V_loc, 1, GL_FALSE, view_mat.toList())
+    light_pos_loc = glGetUniformLocation(program_handle, "LightPosition_worldspace")
+    glUniform3f(light_pos_loc, light_pos.x, light_pos.y, light_pos.z)
+    MVP_loc = glGetUniformLocation(program_handle, "MVP")
+    M_loc = glGetUniformLocation(program_handle, "M")
+    MVint_loc = glGetUniformLocation(program_handle, "MVint")
+    
+    floor_model_mat = mat4.translation((0,-0.5,0))*mat4.scaling((5,0.1,5))
+    floor_MVP = proj_mat*view_mat*floor_model_mat
+    floor_MVinv = (view_mat*floor_model_mat).inverse()
+    
+    flatten_biasmat = [ 0.5, 0.0, 0.0, 0.0,
+                        0.0, 0.5, 0.0, 0.0,
+                        0.0, 0.0, 0.5, 0.0,
+                        0.5, 0.5, 0.5, 1.0]
+    flatten_biasmat = (c_float*16)(*flatten_biasmat)
+    bias_loc = glGetUniformLocation(program_handle, "DepthBiasMVP")
+    glUniformMatrix4fv(bias_loc, 1, GL_FALSE, flatten_biasmat)
+    shadow_map_loc = glGetUniformLocation(program_handle, "shadowMap")
     
     # initializing other stuff
     glEnable(GL_DEPTH_TEST)
