@@ -42,13 +42,13 @@ void main(){
 	// Light emission properties
 	// You probably want to put them as uniforms
 	vec3 LightColor = vec3(1,1,1);
-	float LightPower = 100.0f;
+	float LightPower = 50.0f;
 	
 	// Material properties
 	//vec3 MaterialDiffuseColor = texture2D( myTextureSampler, UV ).rgb;
 	//vec3 MaterialAmbientColor = vec3(0.1,0.1,0.1) * MaterialDiffuseColor;
 	vec3 MaterialDiffuseColor = vec3(0.5f,0.5f,0.5f);
-	vec3 MaterialAmbientColor = vec3(0.0,0.0,0.0) * MaterialDiffuseColor;
+	vec3 MaterialAmbientColor = vec3(0.5,0.5,0.5) * MaterialDiffuseColor;
 	vec3 MaterialSpecularColor = vec3(0.3,0.3,0.3);
 
 	// Distance to the light
@@ -147,14 +147,14 @@ void main(){
 	//color = vec3(0,0,1);
 	//color = visibility * MaterialDiffuseColor * LightColor;
 	//visibility = 0.0f;
-	/*color = 
+	//visibility = 1.0f;
+	color = 
 		// Ambient : simulates indirect lighting
 		MaterialAmbientColor +
 		// Diffuse : "color" of the object
 		visibility * MaterialDiffuseColor * LightColor * LightPower * cosTheta / (distance*distance) +
 		// Specular : reflective highlight, like a mirror
 		visibility * MaterialSpecularColor * LightColor * LightPower * pow(cosAlpha,5) / (distance*distance);
-*/
-	if(visibility < 1.0f) color = MaterialDiffuseColor*0.0f;
-	else color = MaterialDiffuseColor*2.0f;
+//	if(visibility < 1.0f) color = MaterialDiffuseColor*0.0f; //black
+//	else color = MaterialDiffuseColor*2.0f; //white
 }

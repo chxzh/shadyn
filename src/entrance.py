@@ -14,12 +14,14 @@ from mpl_toolkits.axisartist import floating_axes
 from win32con import N_TMASK
 
 def _main():
-    draw_projected_shadows()
+#     draw_projected_shadows()
+    draw_a_few_cubes()
     return
 
 def draw_projected_shadows():    
     flatten = lambda l: [u for t in l for u in t]
-    c_array = lambda c_type: lambda l: (c_type*len(l))(*l)
+    c_array = lambda c_type: lambda l: (c_type*len(l))(*l)    
+    look_at = lambda eye, at, up: mat4.lookAt(eye, 2*eye - at, up).inverse()
     def shadow_proj_mat(plane_normal, plane_point, light_pos):
         if type(plane_normal) == vec3:
             plane_normal = plane_normal.normalize()
@@ -99,7 +101,7 @@ def draw_projected_shadows():
     model_mat.rotate(pi / 2, vec3(1.0, 0.5, 1.7))
     model_mat.translate((0.5, 0, 0))
     # TODO: fix this stupid left-handed coord lookAt func
-    view_mat = mat4.lookAt(vec3(0, 0, -5),
+    view_mat = look_at(vec3(-1, 2, 5),
                            vec3(0, 0, 0),
                            vec3(0, 1, 0))
     proj_mat = mat4.perspective(45, 4./3, 0.1, 100)
@@ -178,6 +180,7 @@ def draw_projected_shadows():
 def draw_a_few_cubes():    
     flatten = lambda l: [u for t in l for u in t]
     c_array = lambda c_type: lambda l: (c_type*len(l))(*l)
+    look_at = lambda eye, at, up: mat4.lookAt(eye, 2*eye - at, up).inverse()
     if not glfw.init():
         return -1;
     # Create a windowed mode window and its OpenGL context
@@ -239,7 +242,7 @@ def draw_a_few_cubes():
     model_mat.scale(vec3(0.5))
     model_mat.rotate(pi / 2, vec3(1.0, 0.5, 1.7))
     model_mat.translate((0.5, 0, 0))
-    view_mat = mat4.lookAt(vec3(0, 0, -5),
+    view_mat = look_at(vec3(0, 2, -5),
                            vec3(0, 0, 0),
                            vec3(0, 1, 0))
     proj_mat = mat4.perspective(45, 4./3, 0.1, 100)
@@ -300,7 +303,7 @@ def draw_a_few_cubes():
     if glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE:
         raise RuntimeError("framebuffer is not okay")
     depth_proj_mat = mat4.perspective(45, 1, 1, 50)
-    depth_view_mat = mat4.lookAt(light_pos, vec3(0), vec3(0,1,0))
+    depth_view_mat = look_at(light_pos, vec3(0), vec3(0,1,0))
     glUseProgram(depth_program_handle)
     depth_vert_loc = glGetAttribLocation(depth_program_handle, 
                                          "vertexPosition_modelspace")
