@@ -8,7 +8,8 @@ uniform mat4 VP;
 //out float depth;
 
 void main(void) {
-  gl_Position = VP * ShadowProjMat * M * vec4(coord3d, 1.0);
-  //depth = gl_Position.z;
-  //f_color = v_color;
+	vec4 position = VP * ShadowProjMat * M * vec4(coord3d, 1.0);
+	gl_Position = position / position.w;
+	//depth = gl_Position.z;
+	//f_color = v_color;
 }
