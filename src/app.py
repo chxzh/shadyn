@@ -2,7 +2,8 @@ import numpy as np
 import glfw
 from OpenGL.GL import *
 from cgkit.cgtypes import *
-import math
+from math import pi, sin, cos, tan
+from cgkit.lookat import LookAt
 
 class Application:
     def __init__(self):
@@ -73,20 +74,71 @@ class Scene:
 class Camera:
     def __init__(self,
                  position=vec3(0.),
-                 target=vec3(0., 0., -1.),
+                 orientation=vec3(0., 0., -1.),
                  up=vec3(0.,1.,0.),
                  projection_matrix=None,
-                 static=False):
+                 lowleft=vec3(0,0),
+                 resolution=vec3(640,480)):
         self.position = position
-        self.target = target
-        self.view_matrix = mat4.lookAt(position, target, up)
+        self.orientation = orientation.normalize()
+        self.up = up
+        self.view_mat = self.look_at(position, position + orientation, up)
         self.projection_matrix = projection_matrix\
             if not projection_matrix == None\
             else mat4.perspective(math.radians(45),4./3,0.1,100)
-        
+        self.lowleft = lowleft
+        self.resolution = resolution
         pass
     
-
+    def look_at(self, position, target, up):
+        self.position = position
+        # TODO: decide where to raise the zero vector exception
+        # when to check if the it is looking at itself        
+        self.orientation = (target - position).normalize()
+        self.up = up
+        # this look-at method has 3 bugs but still usable by fitting it like this
+        self.view_mat = LookAt(self.position,
+                              self.position*2 - target,
+                              self.up).inverse 
+        return self.view_mat
+    
+    def on_resize(self):
+        pass
+    
+class Camera_fps(Camera):
+    def __init__(self,
+                 position=vec3(0),
+                 spin=0,
+                 tilt=0,                 
+                 projection_matrix=None,
+                 lowleft=vec3(0,0),
+                 resolution=vec3(640,480)):
+        # default spin 0 means facing -z, spin positively counter-clockwise
+        self.spin = spin
+        self.tilt = tilt
+        hori_orientation = vec3(-sin(self.spin),0,-cos(self.spin))
+                if abs(self.tilt) != pi/2:
+            up = vec3(0,1,0)
+            if abs(self.tilt) < pi/4:
+                orientation = hori_orientation + vec3(0, tan(self.tilt), 0)
+            else:
+                orientation = hori_orientation / tan(self.tilt) + vec3(0,1,0)
+        else:
+            up = -hori_orientation
+            orientation = vec3(0,1,0) if self.tilt > 0 else vec3(0,-1,0)
+        Camera.__init__(self,
+                        position,
+                        orientation,
+                        up,
+                        projection_matrix, 
+                        lowleft,
+                        resolution)
+    
+    def rotate(self, spin, tilt):
+        pass
+    
+    def translate(self, march, sidle, dive):
+        pass
 
 class Item:
     def __init__(self, obj, 
