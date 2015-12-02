@@ -3,6 +3,7 @@ import glfw
 from OpenGL.GL import *
 from cgkit.cgtypes import *
 from math import pi, sin, cos, tan
+import math
 from cgkit.lookat import LookAt
 
 class Application:
@@ -117,7 +118,7 @@ class Camera_fps(Camera):
         self.spin = spin
         self.tilt = tilt
         hori_orientation = vec3(-sin(self.spin),0,-cos(self.spin))
-                if abs(self.tilt) != pi/2:
+        if abs(self.tilt) != pi/2:
             up = vec3(0,1,0)
             if abs(self.tilt) < pi/4:
                 orientation = hori_orientation + vec3(0, tan(self.tilt), 0)
