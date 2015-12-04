@@ -11,7 +11,6 @@ from OpenGL.GL.VERSION.GL_1_5 import glGenBuffers
 from OpenGL.raw.GL.VERSION.GL_1_5 import glBindBuffer
 import numpy as np
 from mpl_toolkits.axisartist import floating_axes
-from win32con import N_TMASK
 from PIL import Image
 
 def _main():
@@ -220,7 +219,6 @@ def draw_projected_shadows():
         print res
         return res
     draw()
-    r = raw_input("dfsadfsa")
     from scipy import optimize
     res = optimize.minimize(fun=optim_obj, x0=0.0, method='Powell', callback=draw)
     print "__end of optimization__"
