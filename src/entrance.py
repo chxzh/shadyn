@@ -12,10 +12,11 @@ from OpenGL.raw.GL.VERSION.GL_1_5 import glBindBuffer
 import numpy as np
 from mpl_toolkits.axisartist import floating_axes
 from win32con import N_TMASK
+from PIL import Image
 
 def _main():
-#     draw_projected_shadows()
-    draw_a_few_cubes()
+    draw_projected_shadows()
+#     draw_a_few_cubes()
     return
 
 def draw_projected_shadows():    
@@ -38,11 +39,12 @@ def draw_projected_shadows():
         shad_mat[0:3, 3:4] = (D+ntL) * L - L * ntL
         shad_mat[3:4, 0:3] = n_t
         shad_mat[3:4, 3:4] = - ntL
-        return shad_mat.astype(np.float32)
+        return mat4(shad_mat.astype(np.float32).T.tolist())
     if not glfw.init():
         return -1;
     # Create a windowed mode window and its OpenGL context
-    window = glfw.create_window(640, 480, "scene", None, None);
+    width, height = (640, 480)
+    window = glfw.create_window(width * 2, height, "scene", None, None);
 #     window2 = glfw.create_window(640, 480, "floor", None, None);
     if window == None:
         glfw.terminate()
@@ -50,9 +52,6 @@ def draw_projected_shadows():
     # Loop until the user closes the window
     glfw.make_context_current(window)
     glClearColor(0.0, 0.0, 0.2, 1.0)
-#     glfw.make_context_current(window2)
-#     glClearColor(0.0, 0.2, 0.2, 1.0)    
-#     glfw.make_context_current(window)
     program_handle = tools.load_program("../shader/standardShading.v.glsl",
                                         "../shader/standardShading.f.glsl")
     glUseProgram(program_handle)
@@ -98,15 +97,18 @@ def draw_projected_shadows():
     # uniforms    
     model_mat = mat4(1.0)
     model_mat.scale(vec3(0.5))
-    model_mat.rotate(pi / 2, vec3(1.0, 0.5, 1.7))
+    model_mat.rotate(pi / 3, vec3(1.0, 0.5, 1.7))
     model_mat.translate((0.5, 0, 0))
     # TODO: fix this stupid left-handed coord lookAt func
     view_mat = look_at(vec3(-1, 2, 5),
                            vec3(0, 0, 0),
                            vec3(0, 1, 0))
+    view_mat_top = look_at(vec3(0, 4, 0),
+                           vec3(0, 0, 0),
+                           vec3(0, 0, -1))
     proj_mat = mat4.perspective(45, 4./3, 0.1, 100)
     model_view_inv = (view_mat * model_mat).inverse()
-    light_pos = vec3(3,3,3)
+    light_pos = vec3(3,3,0)
     MVP = proj_mat * view_mat * model_mat
     V_loc = glGetUniformLocation(program_handle, "V")
     glUniformMatrix4fv(V_loc, 1, GL_FALSE, view_mat.toList())
@@ -116,7 +118,7 @@ def draw_projected_shadows():
     M_loc = glGetUniformLocation(program_handle, "M")
     MVint_loc = glGetUniformLocation(program_handle, "MVint")
     
-    floor_model_mat = mat4.translation((0,-0.5,0))*mat4.scaling((5,0.1,5))
+    floor_model_mat = mat4.translation((0,-0.51,0))*mat4.scaling((5,0.1,5))
     floor_MVP = proj_mat*view_mat*floor_model_mat
     floor_MVinv = (view_mat*floor_model_mat).inverse()
     
@@ -124,36 +126,48 @@ def draw_projected_shadows():
     shadow_program_handle = tools.load_program("../shader/shadowProjectionShading.v.glsl",
                                                "../shader/shadowProjectionShading.f.glsl")
     glUseProgram(shadow_program_handle)
-    shadow_proj_mat_loc = glGetUniformLocation(shadow_program_handle, "ShadowProjMat")
-    shadow_M_loc = glGetUniformLocation(shadow_program_handle, "M")
-    shadow_VP_loc = glGetUniformLocation(shadow_program_handle, "VP")
+    shadow_MsVP_loc = glGetUniformLocation(shadow_program_handle, "MsVP")
     VP_mat = proj_mat * view_mat;
+    VP_mat_top = proj_mat * view_mat_top;
     shaject_mat = shadow_proj_mat(vec3(0,1,0), vec3(0,-0.45,0), light_pos)
-    #shaject_mat = np.identity(4, dtype = np.float32)
-    glUniformMatrix4fv(shadow_proj_mat_loc, 1, GL_FALSE, shaject_mat.T.flatten())
     glUniform3f(glGetUniformLocation(shadow_program_handle, "shadowColor"),
-                 1.0, 0.0, 1.0) # purple shadow
+                 0.0, 0.0, 0.0) # black shadow
     shadow_v_loc = glGetAttribLocation(shadow_program_handle, "coord3d")
     glEnableVertexAttribArray(shadow_v_loc)
     glBindBuffer(GL_ARRAY_BUFFER, v_buffer)
     glVertexAttribPointer(shadow_v_loc, 3, GL_FLOAT, GL_FALSE, 0, None)
+    
+    basic_program_handle = tools.load_program("../shader/basic.v.glsl",
+                                               "../shader/basic.f.glsl")
+    glUseProgram(basic_program_handle)
+    basic_mvp_loc = glGetUniformLocation(basic_program_handle, "mvp")
+    floor_basic_mvp = proj_mat*view_mat_top*floor_model_mat
+    glUniformMatrix4fv(basic_mvp_loc, 1, GL_FALSE, floor_basic_mvp.toList())
+    basic_v_loc = glGetAttribLocation(basic_program_handle, "coord3d")
+    glEnableVertexAttribArray(basic_v_loc)
+    glBindBuffer(GL_ARRAY_BUFFER, v_buffer)
+    glVertexAttribPointer(basic_v_loc, 3, GL_FLOAT, GL_FALSE, 0, None)
+    
     # initializing other stuff
     glEnable(GL_DEPTH_TEST)
     glDepthFunc(GL_LESS)
     glEnable(GL_CULL_FACE)
-    
-    
-    while not glfw.window_should_close(window):
+    image_obj = Image.open("../img/target.png")
+    image_obj = image_obj.convert("L")
+    def draw(fake_param=0):        
         # Render here
         # Make the window's context current
+        shaject_mat = shadow_proj_mat(vec3(0,1,0), vec3(0,-0.45,0), light_pos)
+        
         glfw.make_context_current(window)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
                 
         # draw the scene          
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glEnable(GL_CULL_FACE)
-        glViewport(0,0,640,480)
-        glUseProgram(program_handle)        
+        glViewport(0,0,width,height)
+        glUseProgram(program_handle)   
+        glUniform3f(light_pos_loc, light_pos.x, light_pos.y, light_pos.z)     
         glUniformMatrix4fv(MVint_loc, 1, GL_TRUE, model_view_inv.toList())
         glUniformMatrix4fv(M_loc, 1, GL_FALSE, model_mat.toList())
         glUniformMatrix4fv(MVP_loc, 1, GL_FALSE, MVP.toList())
@@ -163,17 +177,61 @@ def draw_projected_shadows():
         glUniformMatrix4fv(M_loc, 1, GL_FALSE, floor_model_mat.toList())
         glUniformMatrix4fv(MVP_loc, 1, GL_FALSE, floor_MVP.toList())                        
         glDrawElements(GL_TRIANGLES, len(cube_obj.indices),
-                        GL_UNSIGNED_SHORT, None)
-        
+                        GL_UNSIGNED_SHORT, None)        
         glDisable(GL_CULL_FACE)
         glUseProgram(shadow_program_handle)
-        glUniformMatrix4fv(shadow_M_loc, 1, GL_FALSE, model_mat.toList())
-        glUniformMatrix4fv(shadow_VP_loc, 1, GL_FALSE, VP_mat.toList())                 
+        glUniformMatrix4fv(shadow_MsVP_loc, 1, GL_FALSE, (VP_mat*shaject_mat*model_mat).toList())              
+        glDrawElements(GL_TRIANGLES, len(cube_obj.indices),
+                        GL_UNSIGNED_SHORT, None)
+        
+        
+        glViewport(width, 0, width, height)
+        
+        glDisable(GL_CULL_FACE)               
+        glUseProgram(basic_program_handle)                       
+        glDrawElements(GL_TRIANGLES, len(cube_obj.indices),
+                        GL_UNSIGNED_SHORT, None)  
+        glUseProgram(shadow_program_handle)
+        glUniformMatrix4fv(shadow_MsVP_loc, 1, GL_FALSE, (VP_mat_top*shaject_mat*model_mat).toList())              
+        
+#         glUniformMatrix4fv(shadow_M_loc, 1, GL_FALSE, model_mat.toList())
+#         glUniformMatrix4fv(shadow_VP_loc, 1, GL_FALSE, VP_mat_top.toList())                 
         glDrawElements(GL_TRIANGLES, len(cube_obj.indices),
                         GL_UNSIGNED_SHORT, None)
         # Swap front and back buffers 
         glfw.swap_buffers(window)
         glfw.poll_events()
+    def get_image():            
+        glfw.swap_buffers(window)
+        b = glReadPixels(width, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE)
+        glfw.swap_buffers(window)
+        im = Image.fromstring(mode="RGB", size=(width, height), data=b)
+        im = im.transpose(Image.FLIP_TOP_BOTTOM)
+        im = im.convert("L")
+        return im
+    from PIL import ImageMath as imath
+    def optim_obj(x):
+        # x[0] the light z
+        light_pos.z = x[0]
+        draw()
+        image = get_image()
+        xor = imath.eval("a^b", a=image, b=image_obj)
+        res = sum(xor.getdata())
+        print res
+        return res
+    draw()
+    r = raw_input("dfsadfsa")
+    from scipy import optimize
+    res = optimize.minimize(fun=optim_obj, x0=0.0, method='Powell', callback=draw)
+    print "__end of optimization__"
+    print res
+#     light_pos.z = res.x[0]
+#     print light_pos.z
+#     im = get_image()
+#     im.save("target.png")
+#     im.show()
+    while not glfw.window_should_close(window):
+        draw()
     glfw.terminate();
     pass
 
