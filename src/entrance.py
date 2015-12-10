@@ -4,7 +4,7 @@ import tools
 from app import Application, Object
 from OpenGL.GL import *
 from ctypes import c_uint8, c_float, c_ushort, c_void_p
-from math import pi
+from math import pi, cos, sin
 from cgkit.cgtypes import *
 from OpenGL.raw.GL.ARB.vertex_buffer_object import GL_ARRAY_BUFFER_ARB
 from OpenGL.GL.VERSION.GL_1_5 import glGenBuffers
@@ -39,6 +39,9 @@ def draw_projected_shadows():
         shad_mat[3:4, 0:3] = n_t
         shad_mat[3:4, 3:4] = - ntL
         return mat4(shad_mat.astype(np.float32).T.tolist())
+    class Item:
+        pass
+    cube = Item() # currently just a temporary holder of attributes and uniforms
     if not glfw.init():
         return -1;
     # Create a windowed mode window and its OpenGL context
@@ -54,7 +57,7 @@ def draw_projected_shadows():
     program_handle = tools.load_program("../shader/standardShading.v.glsl",
                                         "../shader/standardShading.f.glsl")
     glUseProgram(program_handle)
-    cube_obj = Object("../obj/cube.obj")
+    cube.obj = Object("../obj/cube.obj")
     
     # initialize VAO
     vao_handle = glGenVertexArrays(1)
@@ -65,19 +68,19 @@ def draw_projected_shadows():
     i_buffer = glGenBuffers(1)
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, i_buffer)
     glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-                 (c_ushort * len(cube_obj.indices))(*cube_obj.indices),
+                 (c_ushort * len(cube.obj.indices))(*cube.obj.indices),
                  GL_STATIC_DRAW)
     # vertices buffer
     v_buffer = glGenBuffers(1)
     glBindBuffer(GL_ARRAY_BUFFER, v_buffer)
-    v_flatten = flatten(cube_obj.vertices)
+    v_flatten = flatten(cube.obj.vertices)
     glBufferData(GL_ARRAY_BUFFER,
                  (c_float * len(v_flatten))(*v_flatten),
                  GL_STATIC_DRAW)
     # normals buffer
     n_buffer = glGenBuffers(1)
     glBindBuffer(GL_ARRAY_BUFFER, n_buffer)
-    n_flatten = flatten(cube_obj.normals)
+    n_flatten = flatten(cube.obj.normals)
     glBufferData(GL_ARRAY_BUFFER,
                  (c_float * len(n_flatten))(*n_flatten),
                  GL_STATIC_DRAW)
@@ -94,10 +97,11 @@ def draw_projected_shadows():
     glVertexAttribPointer(norm_loc, 3, GL_FLOAT, GL_FALSE, 0, None)
     
     # uniforms    
-    model_mat = mat4(1.0)
-    model_mat.scale(vec3(0.5))
-    model_mat.rotate(pi / 3, vec3(1.0, 0.5, 1.7))
-    model_mat.translate((0.5, 0, 0))
+    cube.model_mat = mat4(1.0)
+    cube.model_mat.scale(vec3(0.5))
+    cube.model_mat.rotate(pi / 3, vec3(1.0, 0.5, 1.7))
+    cube.position = vec3(0.5, 0, 1)
+    cube.model_mat.translate(cube.position)
     # TODO: fix this stupid left-handed coord lookAt func
     view_mat = look_at(vec3(-1, 2, 5),
                            vec3(0, 0, 0),
@@ -106,9 +110,10 @@ def draw_projected_shadows():
                            vec3(0, 0, 0),
                            vec3(0, 0, -1))
     proj_mat = mat4.perspective(45, 4./3, 0.1, 100)
-    model_view_inv = (view_mat * model_mat).inverse()
-    light_pos = vec3(3,3,0)
-    MVP = proj_mat * view_mat * model_mat
+    model_view_inv = (view_mat * cube.model_mat).inverse()
+#     light_pos = vec3(2,1,0)
+#     light_pos = vec3(2,2,2)
+    light_pos = vec3(3,3,3)
     V_loc = glGetUniformLocation(program_handle, "V")
     glUniformMatrix4fv(V_loc, 1, GL_FALSE, view_mat.toList())
     light_pos_loc = glGetUniformLocation(program_handle, "LightPosition_worldspace")
@@ -153,7 +158,11 @@ def draw_projected_shadows():
     glEnable(GL_CULL_FACE)
     image_obj = Image.open("../img/target.png")
     image_obj = image_obj.convert("L")
-    def draw(fake_param=0):        
+    def draw(x):                
+        cube.model_mat = mat4(1.0)
+        cube.model_mat.scale(vec3(0.5))
+        cube.model_mat.rotate(x[5], vec3(cos(x[4])*cos(x[3]), sin(x[4]), cos(x[4])*sin(x[3])))
+        cube.model_mat.translate((x[0], x[1], x[2]))
         # Render here
         # Make the window's context current
         shaject_mat = shadow_proj_mat(vec3(0,1,0), vec3(0,-0.45,0), light_pos)
@@ -166,21 +175,23 @@ def draw_projected_shadows():
         glEnable(GL_CULL_FACE)
         glViewport(0,0,width,height)
         glUseProgram(program_handle)   
-        glUniform3f(light_pos_loc, light_pos.x, light_pos.y, light_pos.z)     
+        glUniform3f(light_pos_loc, light_pos.x, light_pos.y, light_pos.z)   
+        model_view_inv = (view_mat * cube.model_mat).inverse()  
         glUniformMatrix4fv(MVint_loc, 1, GL_TRUE, model_view_inv.toList())
-        glUniformMatrix4fv(M_loc, 1, GL_FALSE, model_mat.toList())
+        glUniformMatrix4fv(M_loc, 1, GL_FALSE, cube.model_mat.toList())
+        MVP = proj_mat * view_mat * cube.model_mat
         glUniformMatrix4fv(MVP_loc, 1, GL_FALSE, MVP.toList())
-        glDrawElements(GL_TRIANGLES, len(cube_obj.indices),
+        glDrawElements(GL_TRIANGLES, len(cube.obj.indices),
                         GL_UNSIGNED_SHORT, None);        
         glUniformMatrix4fv(MVint_loc, 1, GL_TRUE, floor_MVinv.toList())
         glUniformMatrix4fv(M_loc, 1, GL_FALSE, floor_model_mat.toList())
         glUniformMatrix4fv(MVP_loc, 1, GL_FALSE, floor_MVP.toList())                        
-        glDrawElements(GL_TRIANGLES, len(cube_obj.indices),
+        glDrawElements(GL_TRIANGLES, len(cube.obj.indices),
                         GL_UNSIGNED_SHORT, None)        
         glDisable(GL_CULL_FACE)
         glUseProgram(shadow_program_handle)
-        glUniformMatrix4fv(shadow_MsVP_loc, 1, GL_FALSE, (VP_mat*shaject_mat*model_mat).toList())              
-        glDrawElements(GL_TRIANGLES, len(cube_obj.indices),
+        glUniformMatrix4fv(shadow_MsVP_loc, 1, GL_FALSE, (VP_mat*shaject_mat*cube.model_mat).toList())              
+        glDrawElements(GL_TRIANGLES, len(cube.obj.indices),
                         GL_UNSIGNED_SHORT, None)
         
         
@@ -188,14 +199,14 @@ def draw_projected_shadows():
         
         glDisable(GL_CULL_FACE)               
         glUseProgram(basic_program_handle)                       
-        glDrawElements(GL_TRIANGLES, len(cube_obj.indices),
+        glDrawElements(GL_TRIANGLES, len(cube.obj.indices),
                         GL_UNSIGNED_SHORT, None)  
         glUseProgram(shadow_program_handle)
-        glUniformMatrix4fv(shadow_MsVP_loc, 1, GL_FALSE, (VP_mat_top*shaject_mat*model_mat).toList())              
+        glUniformMatrix4fv(shadow_MsVP_loc, 1, GL_FALSE, (VP_mat_top*shaject_mat*cube.model_mat).toList())              
         
 #         glUniformMatrix4fv(shadow_M_loc, 1, GL_FALSE, model_mat.toList())
 #         glUniformMatrix4fv(shadow_VP_loc, 1, GL_FALSE, VP_mat_top.toList())                 
-        glDrawElements(GL_TRIANGLES, len(cube_obj.indices),
+        glDrawElements(GL_TRIANGLES, len(cube.obj.indices),
                         GL_UNSIGNED_SHORT, None)
         # Swap front and back buffers 
         glfw.swap_buffers(window)
@@ -208,28 +219,59 @@ def draw_projected_shadows():
         im = im.transpose(Image.FLIP_TOP_BOTTOM)
         im = im.convert("L")
         return im
+    
     from PIL import ImageMath as imath
-    def optim_obj(x):
-        # x[0] the light z
-        light_pos.z = x[0]
-        draw()
+    def optim_obj_xor(x):
+        draw(x)
         image = get_image()
         xor = imath.eval("a^b", a=image, b=image_obj)
         res = sum(xor.getdata())
-        print res
+        print x, res
         return res
-    draw()
-    from scipy import optimize
-    res = optimize.minimize(fun=optim_obj, x0=0.0, method='Powell', callback=draw)
-    print "__end of optimization__"
-    print res
+    
+    X, Y = np.arange(width).reshape(1,width), np.arange(height).reshape(height,1)
+    def get_sec_moment(image):
+        # image should be a gray scale Image object
+        img = 1 - np.array(image.getdata()) / 128 # turn white to 0 and black to 1
+        # using 128 in case of gray
+        img = img.astype(np.int8)
+        img = img.reshape(height, width)
+        M_00 = float(img.sum())        
+        M_10 = (X * img).sum()
+        M_01 = (img * Y).sum()
+        m_10 = M_10 / M_00
+        m_01 = M_01 / M_00
+        X_offset = X-m_10
+        Y_offset = Y-m_01
+        M_20 = ((X_offset**2)*img).sum() / M_00
+        M_02 = (img*(Y_offset**2)).sum() / M_00
+        M_11 = (X_offset*img*Y_offset).sum() / M_00
+        return np.array([M_20, M_11, M_02])
+    
+    Mt_2 = get_sec_moment(image_obj)    
+    def optim_obj_sec_moment(x):
+        draw(x)
+        image = get_image()
+        M_2 = get_sec_moment(image)
+        res = ((Mt_2 - M_2)**2).sum()
+        return res
+    
+    x0 = np.array([0,0,0,0,0,0])
+    draw(x0)
+    optimize = not False
+    if optimize:
+        from scipy import optimize
+        res = optimize.minimize(fun=optim_obj_sec_moment, x0=x0, method='Powell', 
+                                callback=draw, bounds = ((-10, 10,),(-10, 10,),(-10, 10,)))
+        print "__end of optimization__"
+        print res
 #     light_pos.z = res.x[0]
 #     print light_pos.z
 #     im = get_image()
 #     im.save("target.png")
 #     im.show()
     while not glfw.window_should_close(window):
-        draw()
+        draw(res.x)
     glfw.terminate();
     pass
 
