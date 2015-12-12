@@ -12,6 +12,7 @@ from OpenGL.raw.GL.VERSION.GL_1_5 import glBindBuffer
 import numpy as np
 from mpl_toolkits.axisartist import floating_axes
 from PIL import Image
+from __builtin__ import raw_input
 
 def _main():
     draw_projected_shadows()
@@ -161,7 +162,8 @@ def draw_projected_shadows():
     def draw(x):                
         cube.model_mat = mat4(1.0)
         cube.model_mat.scale(vec3(0.5))
-        cube.model_mat.rotate(x[5], vec3(cos(x[4])*cos(x[3]), sin(x[4]), cos(x[4])*sin(x[3])))
+        cube.model_mat.rotate(pi / 3, vec3(1.0, 0.5, 1.7))
+#         cube.model_mat.rotate(x[5], vec3(cos(x[4])*cos(x[3]), sin(x[4]), cos(x[4])*sin(x[3])))
         cube.model_mat.translate((x[0], x[1], x[2]))
         # Render here
         # Make the window's context current
@@ -239,13 +241,13 @@ def draw_projected_shadows():
         M_00 = float(img.sum())        
         M_10 = (X * img).sum()
         M_01 = (img * Y).sum()
-        m_10 = M_10 / M_00
-        m_01 = M_01 / M_00
+        m_10 = M_10 / M_00 if M_00 else 0
+        m_01 = M_01 / M_00 if M_00 else 0
         X_offset = X-m_10
         Y_offset = Y-m_01
-        M_20 = ((X_offset**2)*img).sum() / M_00
-        M_02 = (img*(Y_offset**2)).sum() / M_00
-        M_11 = (X_offset*img*Y_offset).sum() / M_00
+        M_20 = ((X_offset**2)*img).sum() / M_00 if M_00 else 0
+        M_02 = (img*(Y_offset**2)).sum() / M_00 if M_00 else 0
+        M_11 = (X_offset*img*Y_offset).sum() / M_00 if M_00 else 0
         return np.array([M_20, M_11, M_02])
     
     Mt_2 = get_sec_moment(image_obj)    
@@ -254,15 +256,34 @@ def draw_projected_shadows():
         image = get_image()
         M_2 = get_sec_moment(image)
         res = ((Mt_2 - M_2)**2).sum()
+        print res, x
         return res
     
-    x0 = np.array([0,0,0,0,0,0])
+    def get_jac(func, delta, x0):
+        # let func be the air-function and delta as the uniform delta for gradient
+        len_x = len(x0)
+        def jac(x):
+            fx = func(x)
+            grad = np.zeros(len_x)        
+            for i in range(len_x):
+                x_t = np.zeros(len_x)
+                x_t[i] = delta
+                fx_t = func(x+x_t)
+                grad[i] = fx_t - fx
+            return grad / delta
+        return jac
+    
+    x0 = np.array([0.5,0.5,0])
+#     print Mt_2
+#     print optim_obj_sec_moment(x0)
+#     raw_input("return to continue")
     draw(x0)
     optimize = not False
     if optimize:
         from scipy import optimize
-        res = optimize.minimize(fun=optim_obj_sec_moment, x0=x0, method='Powell', 
-                                callback=draw, bounds = ((-10, 10,),(-10, 10,),(-10, 10,)))
+        res = optimize.minimize(fun=optim_obj_sec_moment, x0=x0, method='SLSQP', 
+                                callback=draw, jac=get_jac(optim_obj_sec_moment, 0.005, x0),
+                                bounds=((0, 2.5), (0, 2.5), (None, None)))
         print "__end of optimization__"
         print res
 #     light_pos.z = res.x[0]
