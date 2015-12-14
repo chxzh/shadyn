@@ -159,12 +159,16 @@ def draw_projected_shadows():
     glEnable(GL_CULL_FACE)
     image_obj = Image.open("../img/target.png")
     image_obj = image_obj.convert("L")
-    def draw(x):                
+    def set_param(x):
         cube.model_mat = mat4(1.0)
         cube.model_mat.scale(vec3(0.5))
         cube.model_mat.rotate(pi / 3, vec3(1.0, 0.5, 1.7))
 #         cube.model_mat.rotate(x[5], vec3(cos(x[4])*cos(x[3]), sin(x[4]), cos(x[4])*sin(x[3])))
         cube.model_mat.translate((x[0], x[1], x[2]))
+        return
+    
+    def draw(x):                
+        set_param(x)
         # Render here
         # Make the window's context current
         shaject_mat = shadow_proj_mat(vec3(0,1,0), vec3(0,-0.45,0), light_pos)
@@ -213,6 +217,7 @@ def draw_projected_shadows():
         # Swap front and back buffers 
         glfw.swap_buffers(window)
         glfw.poll_events()
+    
     def get_image():            
         glfw.swap_buffers(window)
         b = glReadPixels(width, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE)
@@ -259,6 +264,21 @@ def draw_projected_shadows():
         print res, x
         return res
     
+    
+    class Optim:
+        def __init__(self):
+            self.error_func = lambda:None
+            self.weight = None
+            self.method = ""
+            self.params = None
+
+        def set_weight(self, *coefficients):
+            self.weight = np.array(coefficients)
+        
+    
+    optim = Optim()
+    
+    
     def get_jac(func, delta, x0):
         # let func be the air-function and delta as the uniform delta for gradient
         len_x = len(x0)
@@ -281,7 +301,7 @@ def draw_projected_shadows():
     optimize = not False
     if optimize:
         from scipy import optimize
-        res = optimize.minimize(fun=optim_obj_sec_moment, x0=x0, method='SLSQP', 
+        res = optimize.minimize(fun=optim_obj_sec_moment, x0=x0, method='BFGS', 
                                 callback=draw, jac=get_jac(optim_obj_sec_moment, 0.005, x0),
                                 bounds=((0, 2.5), (0, 2.5), (None, None)))
         print "__end of optimization__"
