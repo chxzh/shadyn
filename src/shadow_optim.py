@@ -319,24 +319,61 @@ from threading import Thread
 import sys
 
 qt_app = QApplication(sys.argv)
-class MyGUI(QWidget, Thread):
-    def __init__(self):
+class MyGUI(QWidget):
+    def __init__(self, renderer):
         QWidget.__init__(self)
-        Thread.__init__(self)
+        self.renderer = renderer
+        self._init_layout()
+        self._init_components()
+    
+    def _init_layout(self):
         self.setMinimumSize(400, 185)
         self.setMaximumWidth(600)
     
+    def _init_components(self):
+        self.launch_button = QPushButton("launch", self)
+        self.launch_button.resize(100, 20)
+        self.launch_button.move(5,5)
+        QObject.connect(self.launch_button, SIGNAL("clicked()"), self._on_launch)
+        
+    def _on_launch(self):
+        print "rocket is launched!"
+        
+        
     def run(self):
         self.show()
         qt_app.exec_()
 
-def make_a_panel():
-    pass
+class Renderer(Thread):
+    def __init__(self):
+        Thread.__init__(self)
+    
+    def init(self):
+        pass
+    
+    def draw(self):
+        pass
+    
+    def optimize(self, x):
+        pass
+    
+    def set_param(self, x):
+        pass
+    
+    def set_optimizor(self):
+        pass
+    
+    def to_close():
+        return False
+    
+    def run(self):
+        draw_projected_shadows()
 
 def _main():
-    gui = MyGUI()
-    gui.start()
-    draw_projected_shadows()
+    renderer = Renderer()
+#     renderer.start()
+    gui = MyGUI(renderer)
+    gui.run()
     return
 
 if __name__ == "__main__":
