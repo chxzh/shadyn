@@ -5,14 +5,14 @@ from app import Application, Object
 from OpenGL.GL import *
 from ctypes import c_uint8, c_float, c_ushort, c_void_p
 from math import pi, cos, sin
-from cgkit.cgtypes import *
-from OpenGL.raw.GL.ARB.vertex_buffer_object import GL_ARRAY_BUFFER_ARB
-from OpenGL.GL.VERSION.GL_1_5 import glGenBuffers
-from OpenGL.raw.GL.VERSION.GL_1_5 import glBindBuffer
+# from cgkit.cgtypes import *
+# from OpenGL.raw.GL.ARB.vertex_buffer_object import GL_ARRAY_BUFFER_ARB
+# from OpenGL.GL.VERSION.GL_1_5 import glGenBuffers
+# from OpenGL.raw.GL.VERSION.GL_1_5 import glBindBuffer
 import numpy as np
-from mpl_toolkits.axisartist import floating_axes
+# from mpl_toolkits.axisartist import floating_axes
 from PIL import Image
-from __builtin__ import raw_input
+# from __builtin__ import raw_input
 
 def _main():
     draw_projected_shadows()
@@ -297,22 +297,30 @@ def draw_projected_shadows():
 #     print Mt_2
 #     print optim_obj_sec_moment(x0)
 #     raw_input("return to continue")
+    x_res = x0
     draw(x0)
-    optimize = not False
+    import cma
+    res = cma.fmin(objective_function=optim_obj_sec_moment, 
+             x0=x0,
+             sigma0=1)    
+    x_res = res[0]
+    optimize = False
     if optimize:
         from scipy import optimize
         res = optimize.minimize(fun=optim_obj_sec_moment, x0=x0, method='BFGS', 
-                                callback=draw, jac=get_jac(optim_obj_sec_moment, 0.005, x0),
+                                callback=None, jac=get_jac(optim_obj_sec_moment, 0.005, x0),
                                 bounds=((0, 2.5), (0, 2.5), (None, None)))
         print "__end of optimization__"
         print res
+        x_res = res.x
+        
 #     light_pos.z = res.x[0]
 #     print light_pos.z
 #     im = get_image()
 #     im.save("target.png")
 #     im.show()
     while not glfw.window_should_close(window):
-        draw(res.x)
+        draw(x_res)
     glfw.terminate();
     pass
 
