@@ -317,7 +317,7 @@ def draw_projected_shadows():
 
 from PySide.QtGui import *
 from PySide.QtCore import *
-from threading import Thread
+from threading import Thread, Lock
 import sys
 
 qt_app = QApplication(sys.argv)
@@ -518,6 +518,11 @@ class Renderer(Thread):
         # TODO: rewrite this stupid expedient look_at function
         self.look_at = lambda eye, at, up: mat4.lookAt(eye, 2 * eye - at, up).inverse()
 #         self.init()
+        self.ss_update = Lock()
+        self.ss_ready = Lock()
+        self.ss_ready.acquire()
+        self.snapshot = None
+        self.param_lock = Lock()
 
     def draw(self, x):
 #         self.set_param(x)
@@ -572,6 +577,9 @@ class Renderer(Thread):
                         GL_UNSIGNED_SHORT, None)
         # Swap front and back buffers
         glfw.swap_buffers(self.window.handle)
+        if self.ss_update.locked():
+            self._save_snapshot()
+            self.ss_ready.release()
         glfw.poll_events()
 
     def optimize(self, x=None):
@@ -604,14 +612,16 @@ class Renderer(Thread):
     
     def _optim_obj_sec_moment(self, x):
         self.set_param(x)
-        self.draw(x)
-        image = self._get_image()
+        self.ss_update.acquire()
+        self.ss_ready.acquire()
+        self.ss_update.release()
+        image = self.snapshot
         M_2 = self._get_sec_moment(image)
         res = ((self.Mt_2 - M_2)**2).sum()
         print res, x
         return res
     
-    def _get_image(self):                   
+    def _save_snapshot(self):                   
         glfw.swap_buffers(self.window.handle)
         buff = glReadPixels(self.window.width, 0, self.window.width, 
                          self.window.height, GL_RGB, GL_UNSIGNED_BYTE)
@@ -620,7 +630,7 @@ class Renderer(Thread):
                               size=(self.window.width, self.window.height))
         im = im.transpose(Image.FLIP_TOP_BOTTOM)
         im = im.convert("L")
-        return im
+        self.snapshot = im
     
     def _get_sec_moment(self, image):
         # image should be a gray scale Image object
@@ -641,11 +651,13 @@ class Renderer(Thread):
         return np.array([M_20, M_11, M_02])
 
     def set_param(self, x):
+        self.param_lock.acquire()
         self.cube.model_mat = mat4(1.0)
         self.cube.model_mat.scale(vec3(0.5))
         self.cube.model_mat.rotate(pi / 3, vec3(1.0, 0.5, 1.7))
 #         self.cube.model_mat.rotate(x[5], vec3(cos(x[4])*cos(x[3]), sin(x[4]), cos(x[4])*sin(x[3])))
         self.cube.model_mat.translate((x[0], x[1], x[2]))
+        self.param_lock.release()
         return
 
     def set_optimizor(self):
@@ -659,7 +671,9 @@ class Renderer(Thread):
         self.init()
 #         self.optimize()
         while not glfw.window_should_close(self.window.handle):
+            self.param_lock.acquire()
             self.draw(None)
+            self.param_lock.release()
         glfw.terminate()
         pass
 
