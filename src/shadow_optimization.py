@@ -346,6 +346,30 @@ class MyGUI(QWidget):
         self.show()
         qt_app.exec_()
 
+
+class Optimizer(Thread):
+    def __init__(self, renderer):
+        Thread.__init__(self)
+        self.green_light = Lock()
+        self.renderer()
+    
+    def run(self):
+        # collect params
+        # build optimizer
+        # wrap optimizer with green_light
+        pass
+        
+    def _wrap_eval(self, func):
+        '''
+        wrapping the evaluation function to be controllable by locks
+        '''
+        def wrapped(x):
+            self.green_light.acquire()
+            self.green_light.release()
+            return func(x)
+        return wrapped
+
+
 class Renderer(Thread):
 
     @classmethod
