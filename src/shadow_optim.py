@@ -9,6 +9,7 @@ from cgkit.cgtypes import *
 from PIL import Image
 import cma
 from scipy import optimize
+from astropy.units import count
 
 def draw_projected_shadows():
     flatten = lambda l: [u for t in l for u in t]
@@ -334,15 +335,43 @@ class MyGUI(QWidget):
         self.setMaximumWidth(600)
 
     def _init_components(self):
-        self.launch_button = QPushButton("launch", self)
-        self.launch_button.resize(100, 20)
-        self.launch_button.move(5, 5)
-        QObject.connect(self.launch_button, SIGNAL("clicked()"), self._on_launch)
+        self.play_pause_button = QPushButton("PLAY", self)
+        self.play_pause_button.resize(100, 30)
+        self.play_pause_button.move(5, 5)
+        QObject.connect(self.play_pause_button, SIGNAL("clicked()"), self._on_play_pause)
+        self.is_on_going = False              
+        
+        self.stop_button = QPushButton("STOP", self)
+        self.stop_button.resize(100, 30)
+        self.stop_button.move(110, 5)
+        self.stop_button.setEnabled(False)
+        QObject.connect(self.stop_button, SIGNAL("clicked()"), self._on_stop)
 
-    def _on_launch(self):
-        self._optimizer = Optimizer(self.renderer)
-        self._optimizer.start()
-
+    def _on_play_pause(self):
+        if self._optimizer == None or not self._optimizer.is_alive(): # not started
+            self.play_pause_button.setText("PAUSE")
+            self.stop_button.setEnabled(True)
+            self._optimizer = Optimizer(self.renderer)
+            self._optimizer.start()
+            self.is_on_going = True
+            
+        else:
+            self.is_on_going = not self.is_on_going
+            self._optimizer.switch()
+            if self.is_on_going: # optimizing, to pause
+                self.play_pause_button.setText("PLAY")
+            else: # pausing, to continue
+                self.play_pause_button.setText("PAUSE")
+            
+    
+    def _on_stop(self):
+        # TODO: find a way to stop the optimization
+        self._optimizer.non_stop = False
+        self.stop_button.setEnabled(False)
+        self.is_on_going = False
+        if self._optimizer.green_light.locked():
+            self._optimizer.green_light.release()
+        self.play_pause_button.setText("PLAY")
 
     def run(self):
         self.show()
@@ -359,9 +388,19 @@ class Optimizer(Thread):
         # collect params
         # build optimizer
         # wrap optimizer with green_light
-        wrapped = self._wrap_eval(self.renderer.optimize)
-        wrapped(self.renderer.get_param())
-        pass
+        self.non_stop = True
+        import time
+        counter = 0
+        while self.non_stop:
+            print "optimizing - %d" % counter
+            self.green_light.acquire()
+            self.green_light.release()
+            counter += 1
+            time.sleep(0.5)
+        
+        
+#         wrapped = self._wrap_eval(self.renderer.optimize)
+#         wrapped(self.renderer.get_param())
         
     def _wrap_eval(self, func):
         '''
@@ -372,6 +411,12 @@ class Optimizer(Thread):
             self.green_light.release()
             return func(x)
         return wrapped
+    
+    def switch(self):
+        if self.green_light.locked():
+            self.green_light.release()
+        else:
+            self.green_light.acquire()
 
 
 class Renderer(Thread):
@@ -711,7 +756,7 @@ class Renderer(Thread):
 
 def _main():
     renderer = Renderer()
-    renderer.start()
+#     renderer.start()
     gui = MyGUI(renderer)
     gui.run()
     return
