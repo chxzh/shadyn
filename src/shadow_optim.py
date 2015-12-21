@@ -327,6 +327,7 @@ class MyGUI(QWidget):
         self.renderer = renderer
         self._init_layout()
         self._init_components()
+        self._optimizer = None
 
     def _init_layout(self):
         self.setMinimumSize(400, 185)
@@ -339,7 +340,8 @@ class MyGUI(QWidget):
         QObject.connect(self.launch_button, SIGNAL("clicked()"), self._on_launch)
 
     def _on_launch(self):
-        self.renderer.optimize()
+        self._optimizer = Optimizer(self.renderer)
+        self._optimizer.start()
 
 
     def run(self):
@@ -351,12 +353,14 @@ class Optimizer(Thread):
     def __init__(self, renderer):
         Thread.__init__(self)
         self.green_light = Lock()
-        self.renderer()
+        self.renderer = renderer
     
     def run(self):
         # collect params
         # build optimizer
         # wrap optimizer with green_light
+        wrapped = self._wrap_eval(self.renderer.optimize)
+        wrapped(self.renderer.get_param())
         pass
         
     def _wrap_eval(self, func):
@@ -681,8 +685,12 @@ class Renderer(Thread):
         self.cube.model_mat.rotate(pi / 3, vec3(1.0, 0.5, 1.7))
 #         self.cube.model_mat.rotate(x[5], vec3(cos(x[4])*cos(x[3]), sin(x[4]), cos(x[4])*sin(x[3])))
         self.cube.model_mat.translate((x[0], x[1], x[2]))
+        self.cube.position = vec3(*x)
         self.param_lock.release()
         return
+    
+    def get_param(self):
+        return np.array(self.cube.position)
 
     def set_optimizor(self):
         pass
