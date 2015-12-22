@@ -22,26 +22,39 @@ class MyGUI(QWidget):
     def __init__(self, renderer):
         QWidget.__init__(self)
         self.renderer = renderer
-        self._init_layout()
-        self._init_components()
+        self._init_window()
+        vbox = QVBoxLayout()
+        boxes = [self._init_buttons(),
+                 self._init_combos(),
+                 self._init_checkboxes(),
+                 self._init_param_panel()]
+        for box in boxes:
+            vbox.addStretch(0)
+            vbox.addLayout(box)
+
+        vbox.addStretch(1)
+        self.setLayout(vbox)
         self._optimizer = None
 
-    def _init_layout(self):
+    def _init_window(self):
         self.setMinimumSize(400, 185)
         self.setMaximumWidth(600)
+        self.move(0, 525)
+        self.resize(500, 500)
 
-    def _init_components(self):
+    def _init_buttons(self):
         self.play_pause_button = QPushButton("PLAY", self)
-        self.play_pause_button.resize(100, 30)
-        self.play_pause_button.move(5, 5)
         QObject.connect(self.play_pause_button, SIGNAL("clicked()"), self._on_play_pause)
         self.is_on_going = False              
         
         self.stop_button = QPushButton("STOP", self)
-        self.stop_button.resize(100, 30)
-        self.stop_button.move(110, 5)
         self.stop_button.setEnabled(False)
         QObject.connect(self.stop_button, SIGNAL("clicked()"), self._on_stop)
+        
+        hbox = QHBoxLayout()
+        hbox.addWidget(self.play_pause_button)
+        hbox.addWidget(self.stop_button)
+        return hbox
 
     def _on_play_pause(self):
         if self._optimizer == None or not self._optimizer.is_alive(): # not started
@@ -58,7 +71,6 @@ class MyGUI(QWidget):
                 self.play_pause_button.setText("PLAY")
             else: # pausing, to continue
                 self.play_pause_button.setText("PAUSE")
-            
     
     def _on_stop(self):
         # TODO: find a way to stop the optimization
@@ -69,6 +81,50 @@ class MyGUI(QWidget):
             self._optimizer.green_light.release()
         self.play_pause_button.setText("PLAY")
 
+    def _init_combos(self):
+        self.optim_gbox = QGroupBox("optimization method",self)
+        self.optim_combo = QComboBox(self)
+        self.optim_combo.addItems(["CMA",
+                                   "Powell",
+                                   "Newton-CG"])
+        vbox = QVBoxLayout()
+        vbox.addWidget(self.optim_combo)
+        self.optim_gbox.setLayout(vbox)
+        temp_box = QVBoxLayout()
+        temp_box.addWidget(self.optim_gbox)
+        return temp_box
+    
+    def _init_param_panel(self):
+        vbox = QVBoxLayout()
+        self.param_num = 3
+        self.param_fields = []
+        for i in xrange(self.param_num):
+            param_field = QLineEdit(self)
+            param_field.setValidator(QDoubleValidator(parent=param_field))
+            self.param_fields.append(param_field)
+            vbox.addWidget(param_field)
+        gbox = QGroupBox("parameters")
+        gbox.setLayout(vbox)
+        temp_box = QVBoxLayout()
+        temp_box.addWidget(gbox)
+        return temp_box
+    
+    def _init_checkboxes(self):
+        self.error_func_gbox = QGroupBox("error functions", self)
+        vbox = QVBoxLayout()
+        error_func_names = ["xor", "first moment (normalized)", "second momnet (normalized)"]
+        self.errorfunc_list = []
+        for i, error_func_name in enumerate(error_func_names):
+            checkbox = QCheckBox(self)
+            checkbox.setText(error_func_name)
+            vbox.addWidget(checkbox)
+        self.error_func_gbox.setLayout(vbox)
+#         return self.error_func_gbox
+
+        temp_box = QVBoxLayout()
+        temp_box.addWidget(self.error_func_gbox)
+        return temp_box
+        
     def run(self):
         self.show()
         qt_app.exec_()
@@ -150,6 +206,7 @@ class Renderer(Thread):
         if self.window.handle == None:
             glfw.terminate()
             raise RuntimeError("GLFW cannot create a window.")
+        glfw.set_window_pos(self.window.handle, 9, 36)
         glfw.make_context_current(self.window.handle)
         glClearColor(0.0, 0.0, 0.2, 1.0)
 
