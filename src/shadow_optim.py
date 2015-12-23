@@ -24,18 +24,27 @@ class MyGUI(QWidget):
         self.renderer = renderer
         self._init_window()
         vbox = QVBoxLayout()
-        boxes = [
+        left_boxes = [
                  self._init_set_target(),
                  self._init_select_method(),
                  self._init_select_errorfunc(),
                  self._init_set_param()
                  ]
-        for box in boxes:
+        for box in left_boxes:
             vbox.addLayout(box)
-        
         vbox.addStretch(1)
         vbox.addLayout(self._init_buttons())
-        self.setLayout(vbox)
+        hbox = QHBoxLayout()
+        hbox.addLayout(vbox)
+        
+        vbox = QVBoxLayout()
+        right_boxes = [
+                       self._init_target_preview()
+                       ]
+        for box in right_boxes:
+            vbox.addLayout(box)
+        hbox.addLayout(vbox)
+        self.setLayout(hbox)
         self._optimizer = None
 
     def _init_window(self):
@@ -63,9 +72,22 @@ class MyGUI(QWidget):
                                         "select a target image", "",
                                         "image file (*.png *.jpg *.bmp)")
         self.target_path_label.setText(filename)
-        self.renderer.set_target_image(filename)
+        self.renderer.set_target_image(filename)        
+        self.target_preview_label.setPixmap(QPixmap(filename))
+        self.target_preview_label.show()
         # TODO: deal with cases when the image is unfit
-        
+    
+    def _init_target_preview(self):
+        self.target_preview_label = QLabel("gfdsgfdsfgdffgsd",self)        
+        self.target_preview_label.setGeometry(10, 30, 640, 480)
+        vbox = QVBoxLayout()
+        vbox.addWidget(self.target_preview_label)
+        gbox = QGroupBox("target preview                               ", self)
+        gbox.setLayout(vbox)
+        temp_box = QVBoxLayout()
+        temp_box.addWidget(gbox)
+        return temp_box
+            
     def _init_buttons(self):
         self.play_pause_button = QPushButton("PLAY", self)
         QObject.connect(self.play_pause_button, SIGNAL("clicked()"), self._on_play_pause)
@@ -391,7 +413,7 @@ class Renderer(Thread):
         self._X = np.arange(self.window.width).reshape(1,self.window.width)
         self._Y = np.arange(self.window.height).reshape(self.window.height,1)
         
-        self.Mt_2 = self._get_sec_moment(self.image_target)   
+        self.Mt_2 = self._get_moments(self.image_target)   
     
     def set_target_image(self, filepath):
         self.image_target = Image.open(filepath)
@@ -505,7 +527,7 @@ class Renderer(Thread):
         self.ss_ready.acquire()
         self.ss_update.release()
         image = self.snapshot
-        M_2 = self._get_sec_moment(image)
+        M_2 = self._get_moments(image)
         res = ((self.Mt_2 - M_2)**2).sum()
         print res, x
         return res
@@ -521,7 +543,7 @@ class Renderer(Thread):
         im = im.convert("L")
         self.snapshot = im
     
-    def _get_sec_moment(self, image):
+    def _get_moments(self, image):
         # image should be a gray scale Image object
         img = 1 - np.array(image.getdata()) / 128 # turn white to 0 and black to 1
         # using 128 in case of gray
@@ -534,10 +556,10 @@ class Renderer(Thread):
         m_01 = M_01 / M_00 if M_00 else 0
         X_offset = self._X-m_10
         Y_offset = self._Y-m_01
-        M_20 = ((X_offset**2)*img).sum() / M_00 if M_00 else 0
-        M_02 = (img*(Y_offset**2)).sum() / M_00 if M_00 else 0
-        M_11 = (X_offset*img*Y_offset).sum() / M_00 if M_00 else 0
-        return np.array([M_20, M_11, M_02])
+        m_20 = ((X_offset**2)*img).sum() / M_00 if M_00 else 0
+        m_02 = (img*(Y_offset**2)).sum() / M_00 if M_00 else 0
+        m_11 = (X_offset*img*Y_offset).sum() / M_00 if M_00 else 0
+        return np.array([m_10, m_01]), np.array([m_20, m_11, m_02])
 
     def set_param(self, x):
         self.param_lock.acquire()
