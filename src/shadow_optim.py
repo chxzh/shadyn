@@ -24,24 +24,38 @@ class MyGUI(QWidget):
         self.renderer = renderer
         self._init_window()
         vbox = QVBoxLayout()
-        boxes = [self._init_buttons(),
-                 self._init_combos(),
+        boxes = [
+                 self._init_target_loading(),
+                 self._init_method(),
                  self._init_checkboxes(),
-                 self._init_param_panel()]
+                 self._init_param_panel()
+                 ]
         for box in boxes:
-            vbox.addStretch(0)
             vbox.addLayout(box)
-
+        
         vbox.addStretch(1)
+        vbox.addLayout(self._init_buttons())
         self.setLayout(vbox)
         self._optimizer = None
 
     def _init_window(self):
-        self.setMinimumSize(400, 185)
-        self.setMaximumWidth(600)
+#         self.setMinimumSize(400, 185)
+#         self.setMaximumWidth(600)
         self.move(0, 525)
         self.resize(500, 500)
+        self.setWindowTitle("Shadow Optimization Console")
 
+    def _init_target_loading(self):
+        hbox = QHBoxLayout()
+        self.load_target_button = QPushButton("load from file", self)
+        hbox.addWidget(self.load_target_button)
+        hbox.addStretch(1)
+        gbox = QGroupBox("target shadow", self)
+        gbox.setLayout(hbox)
+        temp_box = QHBoxLayout()
+        temp_box.addWidget(gbox)
+        return temp_box
+        
     def _init_buttons(self):
         self.play_pause_button = QPushButton("PLAY", self)
         QObject.connect(self.play_pause_button, SIGNAL("clicked()"), self._on_play_pause)
@@ -54,6 +68,7 @@ class MyGUI(QWidget):
         hbox = QHBoxLayout()
         hbox.addWidget(self.play_pause_button)
         hbox.addWidget(self.stop_button)
+        hbox.addStretch(1)
         return hbox
 
     def _on_play_pause(self):
@@ -81,49 +96,83 @@ class MyGUI(QWidget):
             self._optimizer.green_light.release()
         self.play_pause_button.setText("PLAY")
 
-    def _init_combos(self):
+    def _init_method(self):
         self.optim_gbox = QGroupBox("optimization method",self)
         self.optim_combo = QComboBox(self)
         self.optim_combo.addItems(["CMA",
+                                   "Nelder-Mead",
                                    "Powell",
-                                   "Newton-CG"])
-        vbox = QVBoxLayout()
+                                   "CG",
+                                   "BFGS",
+                                   "Newton-CG",
+                                   "L-BFGS-B",
+                                   "TNC",
+                                   "COBYLA",
+                                   "SLSQP",
+                                   "dogleg",
+                                   "trust-ncg"])
+        self.armijo_check = QCheckBox(self)
+        self.armijo_check.setText("apply Armijo's Rule on line search")
+        self.armijo_check.setEnabled(False)
+        vbox = QHBoxLayout()
         vbox.addWidget(self.optim_combo)
+        vbox.addWidget(self.armijo_check)
+        vbox.addStretch(1)
         self.optim_gbox.setLayout(vbox)
         temp_box = QVBoxLayout()
         temp_box.addWidget(self.optim_gbox)
         return temp_box
     
+    def _init_checkboxes(self):
+        self.error_func_gbox = QGroupBox("error functions", self)
+        vbox = QVBoxLayout()
+        error_func_names = ["XOR comparison",
+                            "first moments (normalized)",
+                            "secondary moments (normalized)"]
+        self.errorfunc_list = []
+        for error_func_name in error_func_names:
+            checkbox = QCheckBox(self)
+            checkbox.setText(error_func_name)
+            vbox.addWidget(checkbox)
+        hbox = QHBoxLayout()
+        self.weight_button = QPushButton("set weights", self)
+        self.weight_button.setEnabled(False)
+        hbox.addWidget(self.weight_button)
+        hbox.addStretch(1)
+        vbox.addLayout(hbox)
+        self.error_func_gbox.setLayout(vbox)
+        temp_box = QVBoxLayout()
+        temp_box.addWidget(self.error_func_gbox)
+        return temp_box
+
     def _init_param_panel(self):
         vbox = QVBoxLayout()
-        self.param_num = 3
+        self.param_names = ["cube x-coord", "cube y-coord","cube z-coord"]
         self.param_fields = []
-        for i in xrange(self.param_num):
+        for name in self.param_names:
+            hbox = QHBoxLayout()
+            param_label = QLabel(name, self)
+            hbox.addWidget(param_label)
             param_field = QLineEdit(self)
             param_field.setValidator(QDoubleValidator(parent=param_field))
             self.param_fields.append(param_field)
-            vbox.addWidget(param_field)
+            hbox.addWidget(param_field)
+            param_slider = QSlider(Qt.Horizontal, self)
+            hbox.addWidget(param_slider)
+            hbox.setStretch(2,1)
+            vbox.addLayout(hbox)
+        hbox = QHBoxLayout()
+        self.rand_param_button = QPushButton("randomize", self)
+        hbox.addWidget(self.rand_param_button)
+        hbox.addStretch(1)
+        vbox.addLayout(hbox)
         gbox = QGroupBox("parameters")
         gbox.setLayout(vbox)
         temp_box = QVBoxLayout()
         temp_box.addWidget(gbox)
         return temp_box
     
-    def _init_checkboxes(self):
-        self.error_func_gbox = QGroupBox("error functions", self)
-        vbox = QVBoxLayout()
-        error_func_names = ["xor", "first moment (normalized)", "second momnet (normalized)"]
-        self.errorfunc_list = []
-        for i, error_func_name in enumerate(error_func_names):
-            checkbox = QCheckBox(self)
-            checkbox.setText(error_func_name)
-            vbox.addWidget(checkbox)
-        self.error_func_gbox.setLayout(vbox)
-#         return self.error_func_gbox
 
-        temp_box = QVBoxLayout()
-        temp_box.addWidget(self.error_func_gbox)
-        return temp_box
         
     def run(self):
         self.show()
