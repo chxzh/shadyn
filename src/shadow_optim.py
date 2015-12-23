@@ -25,10 +25,10 @@ class MyGUI(QWidget):
         self._init_window()
         vbox = QVBoxLayout()
         boxes = [
-                 self._init_target_loading(),
-                 self._init_method(),
-                 self._init_checkboxes(),
-                 self._init_param_panel()
+                 self._init_set_target(),
+                 self._init_select_method(),
+                 self._init_select_errorfunc(),
+                 self._init_set_param()
                  ]
         for box in boxes:
             vbox.addLayout(box)
@@ -39,22 +39,32 @@ class MyGUI(QWidget):
         self._optimizer = None
 
     def _init_window(self):
-#         self.setMinimumSize(400, 185)
-#         self.setMaximumWidth(600)
         self.move(0, 525)
         self.resize(500, 500)
         self.setWindowTitle("Shadow Optimization Console")
 
-    def _init_target_loading(self):
+    def _init_set_target(self):
         hbox = QHBoxLayout()
         self.load_target_button = QPushButton("load from file", self)
+        QObject.connect(self.load_target_button, SIGNAL("clicked()"), self._on_set_target_file)
         hbox.addWidget(self.load_target_button)
+        self.target_path_label = QLabel("target not set", self)
+        self.target_path_label.setWordWrap(True)
+        hbox.addWidget(self.target_path_label)
         hbox.addStretch(1)
         gbox = QGroupBox("target shadow", self)
         gbox.setLayout(hbox)
         temp_box = QHBoxLayout()
         temp_box.addWidget(gbox)
         return temp_box
+    
+    def _on_set_target_file(self):
+        filename, filter = QFileDialog.getOpenFileName(self, 
+                                        "select a target image", "",
+                                        "image file (*.png *.jpg *.bmp)")
+        self.target_path_label.setText(filename)
+        self.renderer.set_target_image(filename)
+        # TODO: deal with cases when the image is unfit
         
     def _init_buttons(self):
         self.play_pause_button = QPushButton("PLAY", self)
@@ -96,7 +106,7 @@ class MyGUI(QWidget):
             self._optimizer.green_light.release()
         self.play_pause_button.setText("PLAY")
 
-    def _init_method(self):
+    def _init_select_method(self):
         self.optim_gbox = QGroupBox("optimization method",self)
         self.optim_combo = QComboBox(self)
         self.optim_combo.addItems(["CMA",
@@ -123,7 +133,7 @@ class MyGUI(QWidget):
         temp_box.addWidget(self.optim_gbox)
         return temp_box
     
-    def _init_checkboxes(self):
+    def _init_select_errorfunc(self):
         self.error_func_gbox = QGroupBox("error functions", self)
         vbox = QVBoxLayout()
         error_func_names = ["XOR comparison",
@@ -145,7 +155,7 @@ class MyGUI(QWidget):
         temp_box.addWidget(self.error_func_gbox)
         return temp_box
 
-    def _init_param_panel(self):
+    def _init_set_param(self):
         vbox = QVBoxLayout()
         self.param_names = ["cube x-coord", "cube y-coord","cube z-coord"]
         self.param_fields = []
@@ -376,13 +386,17 @@ class Renderer(Thread):
         glEnable(GL_DEPTH_TEST)
         glDepthFunc(GL_LESS)
         glEnable(GL_CULL_FACE)
-        self.image_target = Image.open("../img/target.png")
-        self.image_target = self.image_target.convert("L")
+        self.image_target = None
         
         self._X = np.arange(self.window.width).reshape(1,self.window.width)
         self._Y = np.arange(self.window.height).reshape(self.window.height,1)
         
         self.Mt_2 = self._get_sec_moment(self.image_target)   
+    
+    def set_target_image(self, filepath):
+        self.image_target = Image.open(filepath)
+        self.image_target = self.image_target.convert("L")
+        # TODO: process image if unmatch with
 
     def __init__(self):
         Thread.__init__(self)
