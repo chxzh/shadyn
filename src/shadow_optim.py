@@ -78,7 +78,7 @@ class MyGUI(QWidget):
         # TODO: deal with cases when the image is unfit
     
     def _init_target_preview(self):
-        self.target_preview_label = QLabel("gfdsgfdsfgdffgsd",self)        
+        self.target_preview_label = QLabel("this is where preview of the target image should be showed",self)        
         self.target_preview_label.setGeometry(10, 30, 640, 480)
         vbox = QVBoxLayout()
         vbox.addWidget(self.target_preview_label)
@@ -104,7 +104,8 @@ class MyGUI(QWidget):
         return hbox
 
     def _on_play_pause(self):
-        if self._optimizer == None or not self._optimizer.is_alive(): # not started
+        # not started
+        if self._optimizer == None or not self._optimizer.is_alive():
             self.play_pause_button.setText("PAUSE")
             self.stop_button.setEnabled(True)
             self._optimizer = Optimizer(self.renderer)
@@ -250,7 +251,68 @@ class Optimizer(Thread):
             self.green_light.release()
         else:
             self.green_light.acquire()
-
+    
+    
+    @staticmethod
+    def cma_optimize(name): # name is unused
+        sigma_0 = 1
+        def cma_fmin(f, x):
+            return cma.fmin(objective_function=f, x0=x, sigma0=sigma_0)
+        return cma_fmin
+    
+    @staticmethod
+    def scipy_optimize(name):
+        def fmin(f, x):
+            return optimize.minimize(fun=f, x0=x, method=name)
+        return fmin
+    
+    @staticmethod
+    def scipy_optimize_jac(name):
+        delta = 0.005        
+        def fmin(f, x):
+            return optimize.minimize(fun=f, x0=x, method=name,
+                        jac=_get_jac(f, delta, x))
+        return fmin
+    
+    @staticmethod
+    def _get_jac(func, delta, x0):
+        # let func be the error-function and delta as the uniform delta for gradient
+        len_x = len(x0)
+        def jac(x):
+            fx = func(x)
+            grad = np.zeros(len_x)        
+            for i in range(len_x):
+                x_t = np.zeros(len_x)
+                x_t[i] = delta
+                fx_t = func(x+x_t)
+                grad[i] = fx_t - fx
+            return grad / delta
+        return jac
+        
+    
+    method_dic = {"CMA": cma_optimize,
+                   "Nelder-Mead": scipy_optimize,
+                   "Powell": scipy_optimize,
+                   "CG": scipy_optimize_jac,
+                   "BFGS": scipy_optimize_jac,
+                   "Newton-CG": scipy_optimize_jac,
+                   "L-BFGS-B": scipy_optimize_jac,
+                   "TNC": scipy_optimize_jac,
+                   "COBYLA": scipy_optimize,
+                   "SLSQP": scipy_optimize_jac,
+                   "dogleg": scipy_optimize_jac,
+                   "trust-ncg": scipy_optimize_jac
+                  }
+    
+    def set_method(self, name):
+        pass
+    
+    def set_error_func(self, func_names, weights):
+        if len(func_names) != len(weights):
+            err_msg = "error function number (%d) doesn't match weight number (%d)"\
+                    % (len(func_names), len(weights))
+            raise RuntimeError(err_msg)
+        pass
 
 class Renderer(Thread):
 
@@ -508,7 +570,7 @@ class Renderer(Thread):
         print "optm ends"
     
     def _get_jac(self, func, delta, x0):
-        # let func be the air-function and delta as the uniform delta for gradient
+        # let func be the error-function and delta as the uniform delta for gradient
         len_x = len(x0)
         def jac(x):
             fx = func(x)
@@ -574,9 +636,6 @@ class Renderer(Thread):
     
     def get_param(self):
         return np.array(self.cube.position)
-
-    def set_optimizor(self):
-        pass
 
     def to_close():
         return False
