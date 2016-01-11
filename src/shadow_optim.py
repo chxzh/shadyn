@@ -215,8 +215,15 @@ class MyGUI(QWidget):
 class Optimizer(Thread):
     def __init__(self, renderer):
         Thread.__init__(self)
+        # only when green light is unlocked will the optimization continue
         self.green_light = Lock()
         self.renderer = renderer
+        self._optim_method = lambda *x: None
+        self._error_func_list = []
+        self.set_param = renderer.set_param
+        self.get_param = renderer.get_param
+        self._target_img = None
+        self._target_scores = {}
     
     def run(self):
         # collect params
@@ -289,7 +296,6 @@ class Optimizer(Thread):
             return grad / delta
         return jac
         
-    
     method_dic = {"CMA": cma_optimize,
                    "Nelder-Mead": scipy_optimize,
                    "Powell": scipy_optimize,
@@ -305,14 +311,82 @@ class Optimizer(Thread):
                   }
     
     def set_method(self, name):
-        pass
+        # this is the interface for manager
+        self._optim_method = method_dic[name](name)
+    
     
     def set_error_func(self, func_names, weights):
         if len(func_names) != len(weights):
             err_msg = "error function number (%d) doesn't match weight number (%d)"\
                     % (len(func_names), len(weights))
             raise RuntimeError(err_msg)
+        self._init_target_scores()
+        self.error_func_dic = {
+                "XOR comparison": self._get_xor,
+                "first moments (normalized)": lambda *x:None,
+                "secondary moments (normalized)": lambda *x:None
+            }
+        self._error_func_list = zip([error_func_dic[name] for name in func_names],
+                                     weights)
+            
         pass
+    
+    @staticmethod
+    def _sq_diff(a, b):
+        # calculate the square difference of two equal-shaped numpy array
+        return ((a-b)**2).sum()
+    
+    def set_target(self, image):
+        self.target
+    
+    def error_func(self, img):
+        return sum([weight*func(img) for func, weight in self._error_func_list])
+    
+    @staticmethod
+    def _get_sec_moments(image):
+        # image should be a gray scale Image object
+        img = 1 - np.array(image.getdata()) / 128 # turn white to 0 and black to 1
+        # using 128 in case of gray
+        img = img.astype(np.int8)
+        img = img.reshape(self.window.height, self.window.width)
+        M_00 = float(img.sum())        
+        M_10 = (self._X * img).sum()
+        M_01 = (img * self._Y).sum()
+        m_10 = M_10 / M_00 if M_00 else 0
+        m_01 = M_01 / M_00 if M_00 else 0
+        X_offset = self._X-m_10
+        Y_offset = self._Y-m_01
+        m_20 = ((X_offset**2)*img).sum() / M_00 if M_00 else 0
+        m_02 = (img*(Y_offset**2)).sum() / M_00 if M_00 else 0
+        m_11 = (X_offset*img*Y_offset).sum() / M_00 if M_00 else 0
+        return np.array([m_20, m_11, m_02])    
+    
+    @staticmethod
+    def _get_fst_moments(image):
+        # image should be a gray scale Image object
+        img = 1 - np.array(image.getdata()) / 128 # turn white to 0 and black to 1
+        # using 128 in case of gray
+        img = img.astype(np.int8)
+        img = img.reshape(self.window.height, self.window.width)
+        M_00 = float(img.sum())        
+        M_10 = (self._X * img).sum()
+        M_01 = (img * self._Y).sum()
+        m_10 = M_10 / M_00 if M_00 else 0
+        m_01 = M_01 / M_00 if M_00 else 0
+        return np.array([m_10, m_01])
+        
+    image_vec_list = [_get_sec_moments,
+                      _get_fst_moments]    
+    
+    def _init_target_scores(self):
+        self._target_scores = {func: func(self._target_img)\
+                                for func in self.image_vec_list}
+    
+    from PIL import ImageMath as imath
+    def _get_xor(self, image):
+        xor_img = imath.eval("a^b", a=image, b=self._target_img)
+        return sum(xor_img.getdata())
+        
 
 class Renderer(Thread):
 
@@ -491,7 +565,7 @@ class Renderer(Thread):
         # TODO: rewrite this stupid expedient look_at function
         self.look_at = lambda eye, at, up: mat4.lookAt(eye, 2 * eye - at, up).inverse()
 #         self.init()
-        self.ss_update = Lock()
+        self.ss_update = Lock() # ss is short for snapshot
         self.ss_ready = Lock()
         self.ss_ready.acquire()
         self.snapshot = None
