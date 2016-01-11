@@ -321,15 +321,21 @@ class Optimizer(Thread):
                     % (len(func_names), len(weights))
             raise RuntimeError(err_msg)
         self._init_target_scores()
+        # TODO: change as class method
         self.error_func_dic = {
                 "XOR comparison": self._get_xor,
-                "first moments (normalized)": lambda *x:None,
-                "secondary moments (normalized)": lambda *x:None
+                "first moments (normalized)": self._get_diff(_get_fst_moment),
+                "secondary moments (normalized)": self._get_diff(_get_sec_moments)
             }
         self._error_func_list = zip([error_func_dic[name] for name in func_names],
                                      weights)
             
-        pass
+    
+    def _get_diff(self, vec_func):
+        target = self._target_scores[vec_func]
+        def diff(img):
+            return _sq_diff(target, vec_func(img))
+        return diff
     
     @staticmethod
     def _sq_diff(a, b):
