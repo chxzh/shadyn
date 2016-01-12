@@ -132,18 +132,9 @@ class MyGUI(QWidget):
     def _init_select_method(self):
         self.optim_gbox = QGroupBox("optimization method",self)
         self.optim_combo = QComboBox(self)
-        self.optim_combo.addItems(["CMA",
-                                   "Nelder-Mead",
-                                   "Powell",
-                                   "CG",
-                                   "BFGS",
-                                   "Newton-CG",
-                                   "L-BFGS-B",
-                                   "TNC",
-                                   "COBYLA",
-                                   "SLSQP",
-                                   "dogleg",
-                                   "trust-ncg"])
+        items = Optimizer.method_dic.keys()
+        items.sort()
+        self.optim_combo.addItems(items)
         self.armijo_check = QCheckBox(self)
         self.armijo_check.setText("apply Armijo's Rule on line search")
         self.armijo_check.setEnabled(False)
@@ -258,43 +249,6 @@ class Optimizer(Thread):
             self.green_light.release()
         else:
             self.green_light.acquire()
-    
-    
-    @staticmethod
-    def cma_optimize(name): # name is unused
-        sigma_0 = 1
-        def cma_fmin(f, x):
-            return cma.fmin(objective_function=f, x0=x, sigma0=sigma_0)
-        return cma_fmin
-    
-    @staticmethod
-    def scipy_optimize(name):
-        def fmin(f, x):
-            return optimize.minimize(fun=f, x0=x, method=name)
-        return fmin
-    
-    @staticmethod
-    def scipy_optimize_jac(name):
-        delta = 0.005        
-        def fmin(f, x):
-            return optimize.minimize(fun=f, x0=x, method=name,
-                        jac=_get_jac(f, delta, x))
-        return fmin
-    
-    @staticmethod
-    def _get_jac(func, delta, x0):
-        # let func be the error-function and delta as the uniform delta for gradient
-        len_x = len(x0)
-        def jac(x):
-            fx = func(x)
-            grad = np.zeros(len_x)        
-            for i in range(len_x):
-                x_t = np.zeros(len_x)
-                x_t[i] = delta
-                fx_t = func(x+x_t)
-                grad[i] = fx_t - fx
-            return grad / delta
-        return jac
         
     method_dic = {"CMA": cma_optimize,
                    "Nelder-Mead": scipy_optimize,
@@ -315,18 +269,13 @@ class Optimizer(Thread):
         self._optim_method = method_dic[name](name)
     
     
+    
     def set_error_func(self, func_names, weights):
         if len(func_names) != len(weights):
             err_msg = "error function number (%d) doesn't match weight number (%d)"\
                     % (len(func_names), len(weights))
             raise RuntimeError(err_msg)
-        self._init_target_scores()
-        # TODO: change as class method
-        self.error_func_dic = {
-                "XOR comparison": self._get_xor,
-                "first moments (normalized)": self._get_diff(_get_fst_moment),
-                "secondary moments (normalized)": self._get_diff(_get_sec_moments)
-            }
+        
         self._error_func_list = zip([error_func_dic[name] for name in func_names],
                                      weights)
             
@@ -337,62 +286,112 @@ class Optimizer(Thread):
             return _sq_diff(target, vec_func(img))
         return diff
     
-    @staticmethod
-    def _sq_diff(a, b):
-        # calculate the square difference of two equal-shaped numpy array
-        return ((a-b)**2).sum()
-    
     def set_target(self, image):
-        self.target
+        # TODO: finish setting the target image
+        pass
     
     def error_func(self, img):
         return sum([weight*func(img) for func, weight in self._error_func_list])
     
-    @staticmethod
-    def _get_sec_moments(image):
-        # image should be a gray scale Image object
-        img = 1 - np.array(image.getdata()) / 128 # turn white to 0 and black to 1
-        # using 128 in case of gray
-        img = img.astype(np.int8)
-        img = img.reshape(self.window.height, self.window.width)
-        M_00 = float(img.sum())        
-        M_10 = (self._X * img).sum()
-        M_01 = (img * self._Y).sum()
-        m_10 = M_10 / M_00 if M_00 else 0
-        m_01 = M_01 / M_00 if M_00 else 0
-        X_offset = self._X-m_10
-        Y_offset = self._Y-m_01
-        m_20 = ((X_offset**2)*img).sum() / M_00 if M_00 else 0
-        m_02 = (img*(Y_offset**2)).sum() / M_00 if M_00 else 0
-        m_11 = (X_offset*img*Y_offset).sum() / M_00 if M_00 else 0
-        return np.array([m_20, m_11, m_02])    
     
-    @staticmethod
-    def _get_fst_moments(image):
-        # image should be a gray scale Image object
-        img = 1 - np.array(image.getdata()) / 128 # turn white to 0 and black to 1
-        # using 128 in case of gray
-        img = img.astype(np.int8)
-        img = img.reshape(self.window.height, self.window.width)
-        M_00 = float(img.sum())        
-        M_10 = (self._X * img).sum()
-        M_01 = (img * self._Y).sum()
-        m_10 = M_10 / M_00 if M_00 else 0
-        m_01 = M_01 / M_00 if M_00 else 0
-        return np.array([m_10, m_01])
-        
-    image_vec_list = [_get_sec_moments,
-                      _get_fst_moments]    
     
-    def _init_target_scores(self):
-        self._target_scores = {func: func(self._target_img)\
-                                for func in self.image_vec_list}
     
-    from PIL import ImageMath as imath
-    def _get_xor(self, image):
-        xor_img = imath.eval("a^b", a=image, b=self._target_img)
+    '''
+    error_func_dic is a static attribute of optimizer, which maps error
+    function names to a callable instance. The mapped callable is a closure
+    that takes the target image as input, and return a method calculating the
+    error function value based on input image.
+    '''
+    error_func_dic = {
+                "XOR comparison": _xor_closure.__func__,
+                "first moments (normalized)": _sq_diff_closure(_get_fst_moments),
+                "secondary moments (normalized)": _sq_diff_closure(_get_sec_moments)
+            }
+    ### end of Optimizer ###
+
+
+def cma_optimize(name): # name is unused
+    sigma_0 = 1
+    def cma_fmin(f, x):
+        return cma.fmin(objective_function=f, x0=x, sigma0=sigma_0)
+    return cma_fmin
+
+def scipy_optimize(name):
+    def fmin(f, x):
+        return optimize.minimize(fun=f, x0=x, method=name)
+    return fmin
+
+def scipy_optimize_jac(name):
+    delta = 0.005        
+    def fmin(f, x):
+        return optimize.minimize(fun=f, x0=x, method=name,
+                    jac=_get_jac(f, delta, x))
+    return fmin
+
+def _get_jac(func, delta, x0):
+    # let func be the error-function and delta as the uniform delta for gradient
+    len_x = len(x0)
+    def jac(x):
+        fx = func(x)
+        grad = np.zeros(len_x)        
+        for i in range(len_x):
+            x_t = np.zeros(len_x)
+            x_t[i] = delta
+            fx_t = func(x+x_t)
+            grad[i] = fx_t - fx
+        return grad / delta
+    return jac
+
+def _sq_diff(a, b):
+    # calculate the square difference of two equal-shaped numpy array
+    return ((a-b)**2).sum()
+
+def _get_sec_moments(image):
+    # image should be a gray scale Image object
+    img = 1 - np.array(image.getdata()) / 128 # turn white to 0 and black to 1
+    # using 128 in case of gray
+    img = img.astype(np.int8)
+    img = img.reshape(self.window.height, self.window.width)
+    M_00 = float(img.sum())        
+    M_10 = (self._X * img).sum()
+    M_01 = (img * self._Y).sum()
+    m_10 = M_10 / M_00 if M_00 else 0
+    m_01 = M_01 / M_00 if M_00 else 0
+    X_offset = self._X-m_10
+    Y_offset = self._Y-m_01
+    m_20 = ((X_offset**2)*img).sum() / M_00 if M_00 else 0
+    m_02 = (img*(Y_offset**2)).sum() / M_00 if M_00 else 0
+    m_11 = (X_offset*img*Y_offset).sum() / M_00 if M_00 else 0
+    return np.array([m_20, m_11, m_02])    
+    
+def _get_fst_moments(image):
+    # image should be a gray scale Image object
+    img = 1 - np.array(image.getdata()) / 128 # turn white to 0 and black to 1
+    # using 128 in case of gray
+    img = img.astype(np.int8)
+    img = img.reshape(self.window.height, self.window.width)
+    M_00 = float(img.sum())        
+    M_10 = (self._X * img).sum()
+    M_01 = (img * self._Y).sum()
+    m_10 = M_10 / M_00 if M_00 else 0
+    m_01 = M_01 / M_00 if M_00 else 0
+    return np.array([m_10, m_01])
+
+from PIL import ImageMath as imath    
+def _xor_closure(target):
+    def _get_xor(image):
+        xor_img = imath.eval("a^b", a=image, b=target)
         return sum(xor_img.getdata())
-        
+    return _get_xor
+
+def _sq_diff_closure(func):
+    def sub_closure(target):
+        res_t = func(target)
+        def sqdiff(image):
+            return _sq_diff(res_t, func(image))
+        return sqdiff
+    return sub_closure
+
 
 class Renderer(Thread):
 
