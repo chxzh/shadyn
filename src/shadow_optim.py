@@ -46,6 +46,7 @@ class MyGUI(QWidget):
         hbox.addLayout(vbox)
         self.setLayout(hbox)
         self._optimizer = None
+        self.target_path = None
 
     def _init_window(self):
         self.move(0, 525)
@@ -107,20 +108,27 @@ class MyGUI(QWidget):
     def _on_play_pause(self):
         # not started
         if self._optimizer == None or not self._optimizer.is_alive():
-            self.play_pause_button.setText("PAUSE")
-            self.stop_button.setEnabled(True)
             self._optimizer = Optimizer(self.renderer)
             # configurating the optimizer by feeding in optimizing-method and error function
-            self._optimizer.set_target(self.target_path)
+            if self.target_path != None:
+                self._optimizer.set_target(self.target_path)
+            else:                
+                msg_box = QMessageBox()
+                msg_box.setText("no target image is selected")
+                msg_box.exec_()
+                return
             self._optimizer.set_method(self.optim_combo.currentText())
             try:
                 self._optimizer.set_error_func(*self._get_error_func_pairs())
             except RuntimeWarning as rtwng:
                 msg_box = QMessageBox()
-                msg_box.setText("no error function selected")
+                msg_box.setText("no error function is selected")
                 msg_box.exec_()
                 return
-            self._optimizer.start()
+            self._optimizer.set_finished_callback(self._on_optim_done)
+            self._optimizer.start()            
+            self.play_pause_button.setText("PAUSE")
+            self.stop_button.setEnabled(True)
             self.is_on_going = True
         else:
             # started already
@@ -133,12 +141,18 @@ class MyGUI(QWidget):
     
     def _on_stop(self):
         # TODO: find a way to stop the optimization
-        self._optimizer.non_stop = False
+        if self.is_on_going: # the optimization is not paused
+            # locking the green light to pause the current optimization
+            self._optimizer.green_light.acquire()
+        self._optimizer = None
+        self._on_optim_done()
+        
+    def _on_optim_done(self):
+        # this method is called when an optimization is done,        
+        self.play_pause_button.setText("PLAY")
         self.stop_button.setEnabled(False)
         self.is_on_going = False
-        if self._optimizer.green_light.locked():
-            self._optimizer.green_light.release()
-        self.play_pause_button.setText("PLAY")
+        pass
 
     def _init_select_method(self):
         self.optim_gbox = QGroupBox("optimization method",self)
@@ -328,17 +342,18 @@ class Optimizer(Thread):
         self.get_param = renderer.get_param
         self._target_img = None
         self._target_scores = {}
+        self._finished_callback = lambda *args: None
+        self._finished_callback_args = []
     
     def run(self):
         # collect params
         # build optimizer
         # wrap optimizer with green_light
-        self.non_stop = True
         import time
         counter = 0
         self._optim_method(x=self.renderer.get_param(),
                            f=self._wrap_eval(self.error_func))
-        print "------optim-done-------"
+        self._finished_callback(*self._finished_callback_args)
         
 #         wrapped = self._wrap_eval(self.renderer.optimize)
 #         wrapped(self.renderer.get_param())
@@ -382,9 +397,6 @@ class Optimizer(Thread):
         # this is the interface for manager
         self._optim_method = Optimizer.method_dic[name](name)
     
-    """
-    
-    """
     def set_error_func(self, func_names, weights):
         if len(func_names) != len(weights):
             err_msg = "error function number (%d) doesn't match weight number (%d)"\
@@ -401,6 +413,10 @@ class Optimizer(Thread):
         self._target_img = self._target_img.convert("L")
         # used to have other pre-computation when setting an target image
     
+    def set_finished_callback(self, callback, *args):
+        self._finished_callback = callback
+        self._finished_callback_args = args
+        
     def error_func(self, x):
         self.renderer.set_param(x)
         self.renderer.ss_update.acquire()
