@@ -71,6 +71,7 @@ class MyGUI(QWidget):
         filename, filter = QFileDialog.getOpenFileName(self, 
                                         "select a target image", "",
                                         "image file (*.png *.jpg *.bmp)")
+        self.target_path = filename
         self.target_path_label.setText(filename)
         self.renderer.set_target_image(filename)        
         self.target_preview_label.setPixmap(QPixmap(filename))
@@ -109,10 +110,20 @@ class MyGUI(QWidget):
             self.play_pause_button.setText("PAUSE")
             self.stop_button.setEnabled(True)
             self._optimizer = Optimizer(self.renderer)
+            # configurating the optimizer by feeding in optimizing-method and error function
+            self._optimizer.set_target(self.target_path)
+            self._optimizer.set_method(self.optim_combo.currentText())
+            try:
+                self._optimizer.set_error_func(*self._get_error_func_pairs())
+            except RuntimeWarning as rtwng:
+                msg_box = QMessageBox()
+                msg_box.setText("no error function selected")
+                msg_box.exec_()
+                return
             self._optimizer.start()
             self.is_on_going = True
-            
         else:
+            # started already
             self.is_on_going = not self.is_on_going
             self._optimizer.switch()
             if self.is_on_going: # optimizing, to pause
@@ -150,14 +161,14 @@ class MyGUI(QWidget):
     def _init_select_errorfunc(self):
         self.error_func_gbox = QGroupBox("error functions", self)
         vbox = QVBoxLayout()
-        error_func_names = ["XOR comparison",
-                            "first moments (normalized)",
-                            "secondary moments (normalized)"]
-        self.errorfunc_list = []
+        error_func_names = Optimizer.error_func_dic.keys()
+        error_func_names.sort()
+        self.errorfunc_chbox_list = []        
         for error_func_name in error_func_names:
             checkbox = QCheckBox(self)
             checkbox.setText(error_func_name)
             vbox.addWidget(checkbox)
+            self.errorfunc_chbox_list.append(checkbox)
         hbox = QHBoxLayout()
         self.weight_button = QPushButton("set weights", self)
         self.weight_button.setEnabled(False)
@@ -168,6 +179,16 @@ class MyGUI(QWidget):
         temp_box = QVBoxLayout()
         temp_box.addWidget(self.error_func_gbox)
         return temp_box
+    
+    def _get_error_func_pairs(self):
+        # return the error function selection and corresponding weights
+        names, weights = [], []
+        for checkbox in self.errorfunc_chbox_list:
+            if checkbox.isChecked():
+                names.append(checkbox.text())
+                weights.append(1) # TODO: make a real weight
+        if len(names) == 0: raise RuntimeWarning("No error function selected")
+        return names, weights
 
     def _init_set_param(self):
         vbox = QVBoxLayout()
@@ -195,119 +216,12 @@ class MyGUI(QWidget):
         temp_box = QVBoxLayout()
         temp_box.addWidget(gbox)
         return temp_box
-    
-
         
     def run(self):
         self.show()
         qt_app.exec_()
-
-
-class Optimizer(Thread):
-    def __init__(self, renderer):
-        Thread.__init__(self)
-        # only when green light is unlocked will the optimization continue
-        self.green_light = Lock()
-        self.renderer = renderer
-        self._optim_method = lambda *x: None
-        self._error_func_list = []
-        self.set_param = renderer.set_param
-        self.get_param = renderer.get_param
-        self._target_img = None
-        self._target_scores = {}
     
-    def run(self):
-        # collect params
-        # build optimizer
-        # wrap optimizer with green_light
-        self.non_stop = True
-        import time
-        counter = 0
-        while self.non_stop:
-            print "optimizing - %d" % counter
-            self.green_light.acquire()
-            self.green_light.release()
-            counter += 1
-            time.sleep(0.5)
-        
-        
-#         wrapped = self._wrap_eval(self.renderer.optimize)
-#         wrapped(self.renderer.get_param())
-        
-    def _wrap_eval(self, func):
-        '''
-        wrapping the evaluation function to be controllable by locks
-        '''
-        def wrapped(x):
-            self.green_light.acquire()
-            self.green_light.release()
-            return func(x)
-        return wrapped
-    
-    def switch(self):
-        if self.green_light.locked():
-            self.green_light.release()
-        else:
-            self.green_light.acquire()
-        
-    method_dic = {"CMA": cma_optimize,
-                   "Nelder-Mead": scipy_optimize,
-                   "Powell": scipy_optimize,
-                   "CG": scipy_optimize_jac,
-                   "BFGS": scipy_optimize_jac,
-                   "Newton-CG": scipy_optimize_jac,
-                   "L-BFGS-B": scipy_optimize_jac,
-                   "TNC": scipy_optimize_jac,
-                   "COBYLA": scipy_optimize,
-                   "SLSQP": scipy_optimize_jac,
-                   "dogleg": scipy_optimize_jac,
-                   "trust-ncg": scipy_optimize_jac
-                  }
-    
-    def set_method(self, name):
-        # this is the interface for manager
-        self._optim_method = method_dic[name](name)
-    
-    
-    
-    def set_error_func(self, func_names, weights):
-        if len(func_names) != len(weights):
-            err_msg = "error function number (%d) doesn't match weight number (%d)"\
-                    % (len(func_names), len(weights))
-            raise RuntimeError(err_msg)
-        
-        self._error_func_list = zip([error_func_dic[name] for name in func_names],
-                                     weights)
-            
-    
-    def _get_diff(self, vec_func):
-        target = self._target_scores[vec_func]
-        def diff(img):
-            return _sq_diff(target, vec_func(img))
-        return diff
-    
-    def set_target(self, image):
-        # TODO: finish setting the target image
-        pass
-    
-    def error_func(self, img):
-        return sum([weight*func(img) for func, weight in self._error_func_list])
-    
-    
-    
-    
-    '''
-    error_func_dic is a static attribute of optimizer, which maps error
-    function names to a callable instance. The mapped callable is a closure
-    that takes the target image as input, and return a method calculating the
-    error function value based on input image.
-    '''
-    error_func_dic = {
-                "XOR comparison": _xor_closure.__func__,
-                "first moments (normalized)": _sq_diff_closure(_get_fst_moments),
-                "secondary moments (normalized)": _sq_diff_closure(_get_sec_moments)
-            }
-    ### end of Optimizer ###
+    ### End of My GUI ###
 
 
 def cma_optimize(name): # name is unused
@@ -346,19 +260,26 @@ def _sq_diff(a, b):
     # calculate the square difference of two equal-shaped numpy array
     return ((a-b)**2).sum()
 
+_X, _Y = 0, 0
+
+def _init_X_Y(width, height):
+    _X = np.arange(width).reshape(1, width)
+    _Y = np.arange(height).reshape(height, 1)
+        
 def _get_sec_moments(image):
     # image should be a gray scale Image object
     img = 1 - np.array(image.getdata()) / 128 # turn white to 0 and black to 1
     # using 128 in case of gray
     img = img.astype(np.int8)
-    img = img.reshape(self.window.height, self.window.width)
+    width, height = image.size
+    img = img.reshape(height, width)
     M_00 = float(img.sum())        
-    M_10 = (self._X * img).sum()
-    M_01 = (img * self._Y).sum()
+    M_10 = (_X * img).sum()
+    M_01 = (img * _Y).sum()
     m_10 = M_10 / M_00 if M_00 else 0
     m_01 = M_01 / M_00 if M_00 else 0
-    X_offset = self._X-m_10
-    Y_offset = self._Y-m_01
+    X_offset = _X-m_10
+    Y_offset = _Y-m_01
     m_20 = ((X_offset**2)*img).sum() / M_00 if M_00 else 0
     m_02 = (img*(Y_offset**2)).sum() / M_00 if M_00 else 0
     m_11 = (X_offset*img*Y_offset).sum() / M_00 if M_00 else 0
@@ -369,10 +290,11 @@ def _get_fst_moments(image):
     img = 1 - np.array(image.getdata()) / 128 # turn white to 0 and black to 1
     # using 128 in case of gray
     img = img.astype(np.int8)
-    img = img.reshape(self.window.height, self.window.width)
+    width, height = image.size
+    img = img.reshape(height, width)
     M_00 = float(img.sum())        
-    M_10 = (self._X * img).sum()
-    M_01 = (img * self._Y).sum()
+    M_10 = (_X * img).sum()
+    M_01 = (img * _Y).sum()
     m_10 = M_10 / M_00 if M_00 else 0
     m_01 = M_01 / M_00 if M_00 else 0
     return np.array([m_10, m_01])
@@ -391,10 +313,123 @@ def _sq_diff_closure(func):
             return _sq_diff(res_t, func(image))
         return sqdiff
     return sub_closure
+    
+
+class Optimizer(Thread):
+    def __init__(self, renderer):
+        Thread.__init__(self)
+        # only when green light is unlocked will the optimization continue
+        self.green_light = Lock()
+        self.renderer = renderer
+        self._optim_method = lambda *x: None
+        self._error_func_list = []
+        self.set_param = renderer.set_param
+        self.get_param = renderer.get_param
+        self._target_img = None
+        self._target_scores = {}
+    
+    def run(self):
+        # collect params
+        # build optimizer
+        # wrap optimizer with green_light
+        self.non_stop = True
+        import time
+        counter = 0
+        self._optim_method(x=self.renderer.get_param(),
+                           f=self._wrap_eval(self.error_func))
+        print "------optim-done-------"
+        
+#         wrapped = self._wrap_eval(self.renderer.optimize)
+#         wrapped(self.renderer.get_param())
+        
+    def _wrap_eval(self, func):
+        '''
+        wrapping the evaluation function to be controllable by locks
+        '''
+        def wrapped(*x):
+            self.green_light.acquire()
+            self.green_light.release()
+            return func(*x)
+        return wrapped
+    
+    def switch(self):
+        if self.green_light.locked():
+            self.green_light.release()
+        else:
+            self.green_light.acquire()
+    
+    """
+    method_dic is a mapping between optimizing method to a closure that takes
+    the name (in some case like CMA, name doesn't affect anything) and returns
+    the uniformed optimizing interface fmin(f, x0)
+    """
+    method_dic = {"CMA": cma_optimize,
+                   "Nelder-Mead": scipy_optimize,
+                   "Powell": scipy_optimize,
+                   "CG": scipy_optimize_jac,
+                   "BFGS": scipy_optimize_jac,
+                   "Newton-CG": scipy_optimize_jac,
+                   "L-BFGS-B": scipy_optimize_jac,
+                   "TNC": scipy_optimize_jac,
+                   "COBYLA": scipy_optimize,
+                   "SLSQP": scipy_optimize_jac,
+                   "dogleg": scipy_optimize_jac,
+                   "trust-ncg": scipy_optimize_jac
+                  }
+    
+    def set_method(self, name):
+        # this is the interface for manager
+        self._optim_method = Optimizer.method_dic[name](name)
+    
+    """
+    
+    """
+    def set_error_func(self, func_names, weights):
+        if len(func_names) != len(weights):
+            err_msg = "error function number (%d) doesn't match weight number (%d)"\
+                    % (len(func_names), len(weights))
+            raise RuntimeError(err_msg)
+        
+        self._error_func_list = zip([Optimizer.error_func_dic[name](self._target_img) \
+                                        for name in func_names],
+                                     weights)
+            
+    
+    def _get_diff(self, vec_func):
+        target = self._target_scores[vec_func]
+        def diff(img):
+            return _sq_diff(target, vec_func(img))
+        return diff
+    
+    def set_target(self, image_path):
+        # TODO: finish setting the target image
+        self._target_img = Image.open(image_path)
+        self._target_img = self._target_img.convert("L")
+        # used to have other pre-computation when setting an target image
+    
+    def error_func(self, x):
+        self.renderer.set_param(x)
+        self.renderer.ss_update.acquire()
+        self.renderer.ss_ready.acquire()
+        self.renderer.ss_update.release()
+        img = self.renderer.snapshot
+        return sum([weight*(func(img)) for func, weight in self._error_func_list])
+
+    '''
+    error_func_dic is a static attribute of optimizer, which maps error
+    function names to a callable instance. The mapped callable is a closure
+    that takes the target image as input, and return a method calculating the
+    error function value based on input image.
+    '''
+    error_func_dic = {
+                "XOR comparison": _xor_closure,
+                "first moments (normalized)": _sq_diff_closure(_get_fst_moments),
+                "secondary moments (normalized)": _sq_diff_closure(_get_sec_moments)
+            }
+    ### end of Optimizer ###
 
 
 class Renderer(Thread):
-
     @classmethod
     def shadow_proj_mat(cls, plane_normal, plane_point, light_pos):
         if type(plane_normal) == vec3:
@@ -551,10 +586,11 @@ class Renderer(Thread):
         glEnable(GL_CULL_FACE)
         self.image_target = None
         
+        _init_X_Y(self.window.width, self.window.height)
         self._X = np.arange(self.window.width).reshape(1,self.window.width)
         self._Y = np.arange(self.window.height).reshape(self.window.height,1)
         
-        self.Mt_2 = self._get_moments(self.image_target)   
+        #self.Mt_2 = self._get_moments(self.image_target)   
     
     def set_target_image(self, filepath):
         self.image_target = Image.open(filepath)
@@ -732,7 +768,7 @@ class Renderer(Thread):
 
 def _main():
     renderer = Renderer()
-#     renderer.start()
+    renderer.start()
     gui = MyGUI(renderer)
     gui.run()
     return
