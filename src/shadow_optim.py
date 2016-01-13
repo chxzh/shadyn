@@ -83,7 +83,7 @@ class MyGUI(QWidget):
         self.target_preview_label.setGeometry(10, 30, 640, 480)
         vbox = QVBoxLayout()
         vbox.addWidget(self.target_preview_label)
-        gbox = QGroupBox("target preview                               ", self)
+        gbox = QGroupBox("target preview", self)
         gbox.setLayout(vbox)
         temp_box = QVBoxLayout()
         temp_box.addWidget(gbox)
@@ -263,6 +263,7 @@ def _sq_diff(a, b):
 _X, _Y = 0, 0
 
 def _init_X_Y(width, height):
+    global _X, _Y
     _X = np.arange(width).reshape(1, width)
     _Y = np.arange(height).reshape(height, 1)
         
@@ -394,13 +395,6 @@ class Optimizer(Thread):
                                         for name in func_names],
                                      weights)
             
-    
-    def _get_diff(self, vec_func):
-        target = self._target_scores[vec_func]
-        def diff(img):
-            return _sq_diff(target, vec_func(img))
-        return diff
-    
     def set_target(self, image_path):
         # TODO: finish setting the target image
         self._target_img = Image.open(image_path)
