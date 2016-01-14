@@ -126,6 +126,9 @@ class MyGUI(QWidget):
                 msg_box.exec_()
                 return
             self._optimizer.set_finished_callback(self._on_optim_done)
+            param_lock = Lock()
+            self._optimizer.set_iter_callback(self._on_iter_callback, param_lock)
+            param_updater = Lock_listener(param_lock, self._on_param_updated)
             self._optimizer.start()            
             self.play_pause_button.setText("PAUSE")
             self.stop_button.setEnabled(True)
@@ -148,10 +151,17 @@ class MyGUI(QWidget):
         self._on_optim_done()
         
     def _on_optim_done(self):
-        # this method is called when an optimization is done,        
+        # this method is called when an optimization is done        
         self.play_pause_button.setText("PLAY")
         self.stop_button.setEnabled(False)
         self.is_on_going = False
+        pass
+    
+    def _on_iter_callback(self, param_lock):
+        # this method is a callback method for optimization thread, it
+        # would be called at each round of iteration, by the end of
+        if param_lock.locked(): # for the first round
+            param_lock.release()
         pass
 
     def _init_select_method(self):
@@ -206,7 +216,9 @@ class MyGUI(QWidget):
     
     def _on_param_updated(self):
         # update the fields and bars
-        
+        params = self.renderer.get_param()
+        for param, field in zip(params, self.param_fields):
+            field.setText(str(param))
         pass
 
     def _init_set_param(self):
@@ -240,23 +252,25 @@ class MyGUI(QWidget):
         self.show()
         qt_app.exec_()
     
-    class Lock_listener(Thread):
-        def __init__(self, lock, callback):
-            self._lock = lock
-            self._callback = callback
-            self._terminate_flag = False
-            self.start()
-        
-        def run(self):
-            while True:
-                self._lock.acquire()
-                if self._terminate_flag: break
-                self._callback()
-            
-        def terminate(self):
-            self._terminate_flag = True
-            
     ### End of My GUI ###
+
+
+class Lock_listener(Thread):
+    def __init__(self, lock, callback):
+        Thread.__init__(self)
+        self._lock = lock
+        self._callback = callback
+        self._terminate_flag = False
+        self.start()
+    
+    def run(self):
+        while True:
+            self._lock.acquire()
+            if self._terminate_flag: break
+            self._callback()
+        
+    def terminate(self):
+        self._terminate_flag = True           
 
 
 def cma_optimize(name): # name is unused
@@ -450,7 +464,7 @@ class Optimizer(Thread):
         self.renderer.ss_ready.acquire()
         self.renderer.ss_update.release()
         img = self.renderer.snapshot
-        self._iter_callback(self._iter_callback_args)
+        self._iter_callback(*self._iter_callback_args)
         return sum([weight*(func(img)) for func, weight in self._error_func_list])
 
     '''
