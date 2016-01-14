@@ -203,6 +203,11 @@ class MyGUI(QWidget):
                 weights.append(1) # TODO: make a real weight
         if len(names) == 0: raise RuntimeWarning("No error function selected")
         return names, weights
+    
+    def _on_param_updated(self):
+        # update the fields and bars
+        
+        pass
 
     def _init_set_param(self):
         vbox = QVBoxLayout()
@@ -235,6 +240,22 @@ class MyGUI(QWidget):
         self.show()
         qt_app.exec_()
     
+    class Lock_listener(Thread):
+        def __init__(self, lock, callback):
+            self._lock = lock
+            self._callback = callback
+            self._terminate_flag = False
+            self.start()
+        
+        def run(self):
+            while True:
+                self._lock.acquire()
+                if self._terminate_flag: break
+                self._callback()
+            
+        def terminate(self):
+            self._terminate_flag = True
+            
     ### End of My GUI ###
 
 
@@ -344,6 +365,8 @@ class Optimizer(Thread):
         self._target_scores = {}
         self._finished_callback = lambda *args: None
         self._finished_callback_args = []
+        self._iter_callback = lambda *args: None
+        self._iter_callback_args = []
     
     def run(self):
         # collect params
@@ -416,6 +439,10 @@ class Optimizer(Thread):
     def set_finished_callback(self, callback, *args):
         self._finished_callback = callback
         self._finished_callback_args = args
+    
+    def set_iter_callback(self, callback, *args):
+        self._iter_callback = callback
+        self._iter_callback_args = args
         
     def error_func(self, x):
         self.renderer.set_param(x)
@@ -423,6 +450,7 @@ class Optimizer(Thread):
         self.renderer.ss_ready.acquire()
         self.renderer.ss_update.release()
         img = self.renderer.snapshot
+        self._iter_callback(self._iter_callback_args)
         return sum([weight*(func(img)) for func, weight in self._error_func_list])
 
     '''
