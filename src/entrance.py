@@ -5,7 +5,7 @@ from app import Application, Object
 from OpenGL.GL import *
 from ctypes import c_uint8, c_float, c_ushort, c_void_p
 from math import pi, cos, sin
-# from cgkit.cgtypes import *
+from cgkit.cgtypes import *
 # from OpenGL.raw.GL.ARB.vertex_buffer_object import GL_ARRAY_BUFFER_ARB
 # from OpenGL.GL.VERSION.GL_1_5 import glGenBuffers
 # from OpenGL.raw.GL.VERSION.GL_1_5 import glBindBuffer
@@ -15,8 +15,8 @@ from PIL import Image
 # from __builtin__ import raw_input
 
 def _main():
-    draw_projected_shadows()
-#     draw_a_few_cubes()
+#     draw_projected_shadows()
+    draw_a_few_cubes()
     return
 
 def draw_projected_shadows():    
@@ -386,9 +386,9 @@ def draw_a_few_cubes():
     
     # uniforms    
     model_mat = mat4(1.0)
-    model_mat.scale(vec3(0.5))
-    model_mat.rotate(pi / 2, vec3(1.0, 0.5, 1.7))
     model_mat.translate((0.5, 0, 0))
+    model_mat.rotate(pi / 2, vec3(1.0, 0.5, 1.7))
+    model_mat.scale(vec3(0.5))
     view_mat = look_at(vec3(0, 2, -5),
                            vec3(0, 0, 0),
                            vec3(0, 1, 0))

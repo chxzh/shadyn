@@ -609,11 +609,11 @@ class Renderer(Thread):
         glVertexAttribPointer(self.cube.norm_loc, 3, GL_FLOAT, GL_FALSE, 0, None)
 
         # cube uniforms
-        self.cube.model_mat = mat4(1.0)
-        self.cube.model_mat.scale(vec3(0.5))
-        self.cube.model_mat.rotate(pi / 3, vec3(1.0, 0.5, 1.7))
         self.cube.position = vec3(0.5, 0, 1)
+        self.cube.model_mat = mat4(1.0)
         self.cube.model_mat.translate(self.cube.position)
+        self.cube.model_mat.rotate(pi / 3, vec3(1.0, 0.5, 1.7))
+        self.cube.model_mat.scale(vec3(0.5))
 
         # camera initializing
         self.cam_obs = self._Item()  # the camera for human observation
@@ -837,10 +837,11 @@ class Renderer(Thread):
     def set_param(self, x):
         self.param_lock.acquire()
         self.cube.model_mat = mat4(1.0)
-        self.cube.model_mat.scale(vec3(0.5))
-        self.cube.model_mat.rotate(pi / 3, vec3(1.0, 0.5, 1.7))
-#         self.cube.model_mat.rotate(x[5], vec3(cos(x[4])*cos(x[3]), sin(x[4]), cos(x[4])*sin(x[3])))
         self.cube.model_mat.translate((x[0], x[1], x[2]))
+        self.cube.model_mat.rotate(pi / 3, vec3(1.0, 0.5, 1.7))
+        self.cube.model_mat.scale(vec3(0.5))
+#         self.cube.model_mat.rotate(x[5], vec3(cos(x[4])*cos(x[3]), sin(x[4]), cos(x[4])*sin(x[3])))
+
         self.cube.position = vec3(*x)
         self.param_lock.release()
         return
