@@ -33,7 +33,7 @@ class MyGUI(QWidget):
         for box in left_boxes:
             vbox.addLayout(box)
         vbox.addStretch(1)
-        vbox.addLayout(self._init_buttons())
+        vbox.addLayout(self._init_main_control())
         hbox = QHBoxLayout()
         hbox.addLayout(vbox)
         
@@ -47,6 +47,11 @@ class MyGUI(QWidget):
         self.setLayout(hbox)
         self._optimizer = None
         self.target_path = None
+        self.renderer.wait_till_init()
+        self._after_renderer_ready()
+        
+    def _after_renderer_ready(self):
+        self._on_param_updated()
 
     def _init_window(self):
         self.move(0, 525)
@@ -90,15 +95,13 @@ class MyGUI(QWidget):
         temp_box.addWidget(gbox)
         return temp_box
             
-    def _init_buttons(self):
+    def _init_main_control(self):
         self.play_pause_button = QPushButton("PLAY", self)
         QObject.connect(self.play_pause_button, SIGNAL("clicked()"), self._on_play_pause)
         self.is_on_going = False              
-        
         self.stop_button = QPushButton("STOP", self)
         self.stop_button.setEnabled(False)
         QObject.connect(self.stop_button, SIGNAL("clicked()"), self._on_stop)
-        
         hbox = QHBoxLayout()
         hbox.addWidget(self.play_pause_button)
         hbox.addWidget(self.stop_button)
@@ -217,28 +220,36 @@ class MyGUI(QWidget):
     def _on_param_updated(self):
         # update the fields and bars
         params = self.renderer.get_param()
-        for param, field in zip(params, self.param_fields):
-            field.setText(str(param))
-        pass
+        for param, field_bundles in zip(params, self.param_fields):
+            edit, slider, ex_func = field_bundles 
+            edit.setText(str(param))
+            slider.setValue(ex_func(param))
 
     def _init_set_param(self):
         vbox = QVBoxLayout()
         self.param_names = ["cube x-coord", "cube y-coord","cube z-coord"]
         self.param_fields = []
-        for name in self.param_names:
+        for index, name in enumerate(self.param_names):
             hbox = QHBoxLayout()
             param_label = QLabel(name, self)
             hbox.addWidget(param_label)
             param_field = QLineEdit(self)
             param_field.setValidator(QDoubleValidator(parent=param_field))
-            self.param_fields.append(param_field)
+            param_field.returnPressed.connect(self._on_edit_finished)
             hbox.addWidget(param_field)
             param_slider = QSlider(Qt.Horizontal, self)
+            param_slider.setTickPosition(QSlider.TicksBelow)
+            param_slider.sliderMoved.connect(self._on_slider_moved(index, param_field))
             hbox.addWidget(param_slider)
             hbox.setStretch(2,1)
             vbox.addLayout(hbox)
+            _param2val, _val2param = self._get_param_exchanger(-5, 5)
+            self.param_fields.append((param_field, param_slider, 
+                                      _param2val))
         hbox = QHBoxLayout()
         self.rand_param_button = QPushButton("randomize", self)
+        QObject.connect(self.rand_param_button, SIGNAL("clicked()"),
+                        self._on_randomize)        
         hbox.addWidget(self.rand_param_button)
         hbox.addStretch(1)
         vbox.addLayout(hbox)
@@ -247,6 +258,29 @@ class MyGUI(QWidget):
         temp_box = QVBoxLayout()
         temp_box.addWidget(gbox)
         return temp_box
+    
+    def _on_slider_moved_closure(self, index, field):
+        def _on_slider_moved(position):
+            print position
+        return _on_slider_moved
+    
+    def _on_edit_finished(self):
+        print "edit finished"
+    
+    def _get_param_exchanger(self, param_min, param_max):
+        param_min, param_max = min(param_min, param_max), max(param_min, param_max)
+        exchange_rate = 99.0 / (param_max - param_min)
+        def _get_value(param):
+            return max(0, min(int((param-param_min)*exchange_rate),99))
+        def _get_param(value):
+            # value ranges within [0, 99]
+            return float(param_min + value/exchange_rate)
+        return _get_value, _get_param
+    
+    def _on_randomize(self):
+        # TODO: randomize
+        print "randomize params"
+        pass
         
     def run(self):
         self.show()
@@ -663,6 +697,8 @@ class Renderer(Thread):
         self.ss_ready.acquire()
         self.snapshot = None
         self.param_lock = Lock()
+        self._init_finished_lock = Lock()
+        self._init_finished_lock.acquire()
 
     def draw(self, x):
 #         self.set_param(x)
@@ -761,7 +797,7 @@ class Renderer(Thread):
         print res, x
         return res
     
-    def _save_snapshot(self):                   
+    def _save_snapshot(self):
         glfw.swap_buffers(self.window.handle)
         buff = glReadPixels(self.window.width, 0, self.window.width, 
                          self.window.height, GL_RGB, GL_UNSIGNED_BYTE)
@@ -806,10 +842,18 @@ class Renderer(Thread):
 
     def to_close():
         return False
+    
+    def wait_till_init(self):
+        if self._init_finished_lock.locked(): # init is ongoing 
+            self._init_finished_lock.acquire()
+            self._init_finished_lock.release()
+        return
 
     def run(self):
 #         draw_projected_shadows()
+        
         self.init()
+        self._init_finished_lock.release()
 #         self.optimize()
         while not glfw.window_should_close(self.window.handle):
             self.param_lock.acquire()
