@@ -235,15 +235,17 @@ class MyGUI(QWidget):
             hbox.addWidget(param_label)
             param_field = QLineEdit(self)
             param_field.setValidator(QDoubleValidator(parent=param_field))
-            param_field.returnPressed.connect(self._on_edit_finished)
             hbox.addWidget(param_field)
             param_slider = QSlider(Qt.Horizontal, self)
             param_slider.setTickPosition(QSlider.TicksBelow)
-            param_slider.sliderMoved.connect(self._on_slider_moved(index, param_field))
             hbox.addWidget(param_slider)
             hbox.setStretch(2,1)
             vbox.addLayout(hbox)
-            _param2val, _val2param = self._get_param_exchanger(-5, 5)
+            _param2val, _val2param = self._get_param_exchanger(-5, 5)            
+            param_slider.valueChanged.connect(
+                    self._on_slider_value_changed_closure(index, param_field, _val2param))
+            param_field.returnPressed.connect(
+                    self._on_edit_returned_closure(index, param_field, param_slider, _param2val))
             self.param_fields.append((param_field, param_slider, 
                                       _param2val))
         hbox = QHBoxLayout()
@@ -259,13 +261,19 @@ class MyGUI(QWidget):
         temp_box.addWidget(gbox)
         return temp_box
     
-    def _on_slider_moved_closure(self, index, field):
-        def _on_slider_moved(position):
-            print position
-        return _on_slider_moved
+    def _on_slider_value_changed_closure(self, index, field, val2param):
+        def _on_value_change(value):
+            param = val2param(value)
+            field.setText(str(param))
+            self.renderer.set_param_indiv(param, index)
+        return _on_value_change
     
-    def _on_edit_finished(self):
-        print "edit finished"
+    def _on_edit_returned_closure(self, index, field, slider, param2val):
+        def _on_returned():
+            param = float(field.text())
+            slider.setValue(param2val(param))
+            self.renderer.set_param_indiv(param, index)
+        return _on_returned
     
     def _get_param_exchanger(self, param_min, param_max):
         param_min, param_max = min(param_min, param_max), max(param_min, param_max)
@@ -836,6 +844,12 @@ class Renderer(Thread):
         self.cube.position = vec3(*x)
         self.param_lock.release()
         return
+    
+    def set_param_indiv(self, x_i, i):
+        # set one individual component of the parameters
+        x = self.get_param()
+        x[i] = x_i
+        self.set_param(x)
     
     def get_param(self):
         return np.array(self.cube.position)
