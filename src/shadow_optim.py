@@ -243,9 +243,9 @@ class MyGUI(QWidget):
             vbox.addLayout(hbox)
             _param2val, _val2param = self._get_param_exchanger(-5, 5)            
             param_slider.valueChanged.connect(
-                    self._on_slider_value_changed_closure(index, param_field, _val2param))
+                    self._on_slider_value_changed_closure(index, param_field, _param2val, _val2param))
             param_field.returnPressed.connect(
-                    self._on_edit_returned_closure(index, param_field, param_slider, _param2val))
+                    self._on_edit_returned_closure(index, param_field, param_slider, _param2val, _val2param))
             self.param_fields.append((param_field, param_slider, 
                                       _param2val))
         hbox = QHBoxLayout()
@@ -261,14 +261,18 @@ class MyGUI(QWidget):
         temp_box.addWidget(gbox)
         return temp_box
     
-    def _on_slider_value_changed_closure(self, index, field, val2param):
+    def _on_slider_value_changed_closure(self, index, field, param2val, val2param):
         def _on_value_change(value):
+            cur_param = float(field.text())
+            if param2val(cur_param) == value:
+                # slider unchanged, shouldn't mess with line edit
+                return
             param = val2param(value)
             field.setText(str(param))
             self.renderer.set_param_indiv(param, index)
         return _on_value_change
     
-    def _on_edit_returned_closure(self, index, field, slider, param2val):
+    def _on_edit_returned_closure(self, index, field, slider, param2val, val2param):
         def _on_returned():
             param = float(field.text())
             slider.setValue(param2val(param))
