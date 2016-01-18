@@ -133,6 +133,7 @@ class MyGUI(QWidget):
             param_lock = Lock()
             self._optimizer.set_iter_callback(self._on_iter_callback, param_lock)
             param_updater = Lock_listener(param_lock, self._on_param_updated)
+            self._optimizer.linear_search_first = self.armijo_check.checkState()
             self._optimizer.start()            
             self.play_pause_button.setText("PAUSE")
             self.stop_button.setEnabled(True)
@@ -244,7 +245,6 @@ class MyGUI(QWidget):
         self.param_attributes = [("cube x-coord", -5, 5), 
                                  ("cube y-coord", -5, 5), 
                                  ("cube z-coord", -5, 5)]
-        self.param_names = ["cube x-coord", "cube y-coord","cube z-coord"]
         self.param_fields = []
         for index, param_attribute in enumerate(self.param_attributes):
             name, slider_min, slider_max = param_attribute
@@ -447,6 +447,7 @@ class Optimizer(Thread):
         self._finished_callback_args = []
         self._iter_callback = lambda *args: None
         self._iter_callback_args = []
+        self.line_search_first = False
     
     def run(self):
         # collect params
