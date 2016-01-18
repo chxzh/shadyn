@@ -174,9 +174,11 @@ class MyGUI(QWidget):
         items = Optimizer.method_dic.keys()
         items.sort()
         self.optim_combo.addItems(items)
+        self.optim_combo.currentIndexChanged.connect(self._on_method_index_changed)
         self.armijo_check = QCheckBox(self)
         self.armijo_check.setText("apply Armijo's Rule on line search")
-        self.armijo_check.setEnabled(False)
+        if not self.optim_combo.currentText() in Optimizer.linear_search_list:
+            self.armijo_check.setEnabled(False)
         vbox = QHBoxLayout()
         vbox.addWidget(self.optim_combo)
         vbox.addWidget(self.armijo_check)
@@ -185,6 +187,13 @@ class MyGUI(QWidget):
         temp_box = QVBoxLayout()
         temp_box.addWidget(self.optim_gbox)
         return temp_box
+    
+    def _on_method_index_changed(self, index):
+        method_name = self.optim_combo.itemText(index)
+        if method_name in Optimizer.linear_search_list:
+            self.armijo_check.setEnabled(True)
+        else:
+            self.armijo_check.setEnabled(False)
     
     def _init_select_errorfunc(self):
         self.error_func_gbox = QGroupBox("error functions", self)
@@ -486,6 +495,8 @@ class Optimizer(Thread):
                    "dogleg": scipy_optimize_jac,
                    "trust-ncg": scipy_optimize_jac
                   }
+    
+    linear_search_list = ['CG', 'BFGS'] # TODO: finish the list
     
     def set_method(self, name):
         # this is the interface for manager
