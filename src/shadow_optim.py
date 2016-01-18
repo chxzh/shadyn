@@ -16,6 +16,7 @@ from PySide.QtGui import *
 from PySide.QtCore import *
 from threading import Thread, Lock
 import sys
+import random
 
 qt_app = QApplication(sys.argv)
 class MyGUI(QWidget):
@@ -220,28 +221,36 @@ class MyGUI(QWidget):
     def _on_param_updated(self):
         # update the fields and bars
         params = self.renderer.get_param()
+        self._update_fields(params)
+            
+    def _update_fields(self, params):
         for param, field_bundles in zip(params, self.param_fields):
-            edit, slider, ex_func = field_bundles 
+            edit, slider, param2val = field_bundles 
             edit.setText(str(param))
-            slider.setValue(ex_func(param))
+            slider.setValue(param2val(param))
 
     def _init_set_param(self):
         vbox = QVBoxLayout()
+        # attribute := (name, slider_min, slider_max)
+        self.param_attributes = [("cube x-coord", -5, 5), 
+                                 ("cube y-coord", -5, 5), 
+                                 ("cube z-coord", -5, 5)]
         self.param_names = ["cube x-coord", "cube y-coord","cube z-coord"]
         self.param_fields = []
-        for index, name in enumerate(self.param_names):
-            hbox = QHBoxLayout()
+        for index, param_attribute in enumerate(self.param_attributes):
+            name, slider_min, slider_max = param_attribute
             param_label = QLabel(name, self)
-            hbox.addWidget(param_label)
             param_field = QLineEdit(self)
             param_field.setValidator(QDoubleValidator(parent=param_field))
-            hbox.addWidget(param_field)
             param_slider = QSlider(Qt.Horizontal, self)
             param_slider.setTickPosition(QSlider.TicksBelow)
+            hbox = QHBoxLayout()
+            hbox.addWidget(param_label)
+            hbox.addWidget(param_field)
             hbox.addWidget(param_slider)
             hbox.setStretch(2,1)
             vbox.addLayout(hbox)
-            _param2val, _val2param = self._get_param_exchanger(-5, 5)            
+            _param2val, _val2param = self._get_param_exchanger(slider_min, slider_max)            
             param_slider.valueChanged.connect(
                     self._on_slider_value_changed_closure(index, param_field, _param2val, _val2param))
             param_field.returnPressed.connect(
@@ -290,8 +299,10 @@ class MyGUI(QWidget):
         return _get_value, _get_param
     
     def _on_randomize(self):
-        # TODO: randomize
-        print "randomize params"
+        new_param = [random.uniform(low, high) for name, low, high in self.param_attributes]
+        new_param = np.array(new_param)
+        self.renderer.set_param(new_param)
+        self._update_fields(new_param)
         pass
         
     def run(self):
