@@ -133,7 +133,8 @@ class MyGUI(QWidget):
             param_lock = Lock()
             self._optimizer.set_iter_callback(self._on_iter_callback, param_lock)
             param_updater = Lock_listener(param_lock, self._on_param_updated)
-            self._optimizer.linear_search_first = self.armijo_check.checkState()
+            if self.armijo_check.isEnabled():
+                self._optimizer.line_search_first = self.armijo_check.checkState()
             self._optimizer.start()            
             self.play_pause_button.setText("PAUSE")
             self.stop_button.setEnabled(True)
@@ -452,15 +453,27 @@ class Optimizer(Thread):
     def run(self):
         # collect params
         # build optimizer
+        err_func = self._wrap_eval(self.error_func)
+        if self.line_search_first:
+            self.line_search_init_param(err_func)
+        else:
+            pass
         # wrap optimizer with green_light
-        import time
-        counter = 0
         self._optim_method(x=self.renderer.get_param(),
-                           f=self._wrap_eval(self.error_func))
+                           f=err_func)
         self._finished_callback(*self._finished_callback_args)
         
 #         wrapped = self._wrap_eval(self.renderer.optimize)
 #         wrapped(self.renderer.get_param())
+
+    def line_search_init_param(self, func):
+        x = self.renderer.get_param()
+        jac = _get_jac(func=func, delta=0.005, x0=x)
+        search_direction = - func(x)/jac(x)
+        res = optimize.line_search(f=func, myfprime=jac, xk=x, pk=search_direction)
+        alpha= res[0]
+        x_new = x + alpha * search_direction
+        self.renderer.set_param(x_new)
         
     def _wrap_eval(self, func):
         '''
