@@ -319,7 +319,7 @@ class MyGUI(QWidget):
         self.show()
         qt_app.exec_()
     
-    ### End of My GUI ###
+    ### End of MyGUI ###
 
 
 class Lock_listener(Thread):
@@ -337,7 +337,9 @@ class Lock_listener(Thread):
             self._callback()
         
     def terminate(self):
-        self._terminate_flag = True           
+        self._terminate_flag = True
+    
+    ### End of Lock_listener ###       
 
 
 def cma_optimize(name): # name is unused
@@ -379,6 +381,7 @@ def _sq_diff(a, b):
 _X, _Y = 0, 0
 
 def _init_X_Y(width, height):
+    # will be called by renderer when the initialization is done
     global _X, _Y
     _X = np.arange(width).reshape(1, width)
     _Y = np.arange(height).reshape(height, 1)
@@ -723,8 +726,6 @@ class Renderer(Thread):
         _init_X_Y(self.window.width, self.window.height)
         self._X = np.arange(self.window.width).reshape(1,self.window.width)
         self._Y = np.arange(self.window.height).reshape(self.window.height,1)
-        
-        #self.Mt_2 = self._get_moments(self.image_target)   
     
     def set_target_image(self, filepath):
         self.image_target = Image.open(filepath)
@@ -806,6 +807,7 @@ class Renderer(Thread):
             self.ss_ready.release()
         glfw.poll_events()
 
+    # obsolete method
     def optimize(self, x=None):
         if x == None:
             x = self.cube.position
@@ -820,6 +822,7 @@ class Renderer(Thread):
         self.set_param(x_res)
         print "optm ends"
     
+    # obsolete method
     def _get_jac(self, func, delta, x0):
         # let func be the error-function and delta as the uniform delta for gradient
         len_x = len(x0)
@@ -834,6 +837,7 @@ class Renderer(Thread):
             return grad / delta
         return jac
     
+    # obsolete method
     def _optim_obj_sec_moment(self, x):
         self.set_param(x)
         self.ss_update.acquire()
@@ -856,6 +860,7 @@ class Renderer(Thread):
         im = im.convert("L")
         self.snapshot = im
     
+    # obsolete method
     def _get_moments(self, image):
         # image should be a gray scale Image object
         img = 1 - np.array(image.getdata()) / 128 # turn white to 0 and black to 1
