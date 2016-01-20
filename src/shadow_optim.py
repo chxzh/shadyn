@@ -17,6 +17,7 @@ from PySide.QtCore import *
 from threading import Thread, Lock
 import sys
 import random
+from astropy.convolution.boundary_extend import DTYPE
 
 qt_app = QApplication(sys.argv)
 class MyGUI(QWidget):
@@ -202,15 +203,21 @@ class MyGUI(QWidget):
         vbox = QVBoxLayout()
         error_func_names = Optimizer.error_func_dic.keys()
         error_func_names.sort()
-        self.errorfunc_chbox_list = []        
-        for error_func_name in error_func_names:
+        self.errorfunc_chbox_list = []    
+        self.weights = []    
+        for index, error_func_name in enumerate(error_func_names):
             checkbox = QCheckBox(self)
             checkbox.setText(error_func_name)
             vbox.addWidget(checkbox)
             self.errorfunc_chbox_list.append(checkbox)
+            self.weights.append(0)
+            checkbox.stateChanged.connect(
+                    self._on_errorfunc_state_changed_closure(index, checkbox))
+        self.checked_num = 0
+        self.weights = np.array(self.weights, dtype=float)
         hbox = QHBoxLayout()
         self.weight_button = QPushButton("set weights", self)
-        self.weight_button.setEnabled(False)
+        self.weight_button.clicked.connect(self._on_weight_button_clicked)
         hbox.addWidget(self.weight_button)
         hbox.addStretch(1)
         vbox.addLayout(hbox)
@@ -219,13 +226,47 @@ class MyGUI(QWidget):
         temp_box.addWidget(self.error_func_gbox)
         return temp_box
     
+    def _on_errorfunc_state_changed_closure(self, index, checkbox):
+        def _on_state_changed(arg__1):
+            # unaffected items should maintain the original balance
+            # all weights sum-up to 1 except all-0
+            if checkbox.checkState():
+                # now checked, unchecked previously
+                self.checked_num += 1
+                self.weights *= (self.checked_num-1)
+                self.weights[index] = 1.0
+                self.weights /= self.checked_num
+            else:
+                # now unchecked, checked previously
+                self.checked_num -= 1                
+                self.weights *= (self.checked_num+1)
+                self.weights[index] = 0.
+                if self.checked_num != 0:
+                    self.weights /= self.checked_num
+            return
+        return _on_state_changed
+    
+    def _on_weight_button_clicked(self):
+        if False: # unselected, prompt to ask
+            pass
+        else:
+            err_func_names = []
+            cur_weights = []
+            for checkbox, weight in zip(self.errorfunc_chbox_list, self.weights):
+                if checkbox.isChecked():
+                    err_func_names.append(checkbox.text())
+                    curweight.append(weight)
+            names, weights = Weight_Dialog.get_weights(self, err_func_names, cur_weights)
+            # TODO: finish this
+        
+        
     def _get_error_func_pairs(self):
         # return the error function selection and corresponding weights
         names, weights = [], []
-        for checkbox in self.errorfunc_chbox_list:
+        for checkbox, weight in zip(self.errorfunc_chbox_list, self.weights):
             if checkbox.isChecked():
                 names.append(checkbox.text())
-                weights.append(1) # TODO: make a real weight
+                weights.append(weight)
         if len(names) == 0: raise RuntimeWarning("No error function selected")
         return names, weights
     
@@ -341,6 +382,24 @@ class Lock_listener(Thread):
     
     ### End of Lock_listener ###       
 
+
+class Weight_Dialog(QDialog):
+    def __init__(self, names, weights):
+        QDialog.__init__(self)
+        self.btn = QPushButton('Click2')
+        vb = QVBoxLayout()
+        vb.addWidget(self.btn)
+        self.setLayout(vb)
+        
+    def run(self):
+        self.exec_()
+        
+    @staticmethod
+    def get_weights(parent=None, err_func_names=None, cur_weights=None):
+        dialog = Weight_Dialog()
+        dialog.exec_()
+        return 
+    ### End of Weight_Dialog ###
 
 def cma_optimize(name): # name is unused
     sigma_0 = 1
