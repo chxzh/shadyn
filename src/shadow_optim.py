@@ -386,11 +386,30 @@ class Lock_listener(Thread):
 class Weight_Dialog(QDialog):
     def __init__(self, names, weights):
         QDialog.__init__(self)
-        self.btn = QPushButton('Click2')
-        vb = QVBoxLayout()
-        vb.addWidget(self.btn)
-        self.setLayout(vb)
+        vbox = QVBoxLayout()
+        hbox = QHBoxLayout()
+        self.weight_slider = weight_slider(names, weights)
+        hbox.addWidget(self.weight_slider)
+        vbox.addLayout(hbox)
+        self.confirm_button = QPushButton('Confirm')
+        self.cancel_button = QPushButton('Cancel')
         
+        btn_box = QHBoxLayout()
+        btn_box.addStretch(1)
+        btn_box.addWidget(self.confirm_button)
+        btn_box.addWidget(self.cancel_button)
+        vbox.addLayout(btn_box)
+        self.setLayout(vbox)
+    
+    def paintEvent(self, event):
+        pass
+#         qp = QPainter()
+#         qp.begin(self.confirm_button)
+#         qp.setPen(QColor(168, 34, 3))
+#         qp.setFont(QFont('Decorative', 10))
+#         qp.drawText(event.rect(), Qt.AlignCenter, "fdafdsa")
+#         qp.end()
+         
     def run(self):
         self.exec_()
         
@@ -400,6 +419,77 @@ class Weight_Dialog(QDialog):
         dialog.exec_()
         return 
     ### End of Weight_Dialog ###
+    
+class weight_slider(QWidget):
+    def __init__(self, names, weights):
+        QWidget.__init__(self)
+        self.setMinimumHeight(10)
+        self.setMaximumHeight(30)
+        self.setFixedWidth(400)
+        self.names = names
+        self.weights = weights
+        n = len(names)
+        # chunk := (name, weight, color, (start, end))
+        self.chunks = zip(names, weights, 
+                          self.color_generator(n), self.chunk_generator(weights))
+    
+    def color_generator(self, n):
+        yield QColor.fromHsv(0, 255, 255)
+        i = 1
+        bar = 2
+        while i < n:
+            hue = 360 * ((i - bar / 2) * 2 + 1) / bar
+            color = QColor.fromHsv(hue, 255, 255)
+            i += 1
+            if i >= bar: bar *= 2
+            yield color
+    
+    def chunk_generator(self, weights):
+        start = 0.0
+        roundint = lambda x: int(round(x))
+        for weight in weights:
+            end = start + self.width()*weight
+            yield (roundint(start), roundint(end)-1)
+            start = end
+    
+    def paintEvent(self, event):
+        qp = QPainter()
+        qp.begin(self)
+        qp.setBrush(QColor(168, 34, 3))
+        qp.drawRect(self.rect())
+        for name, weight, color, chunk in self.chunks:
+            qp.setBrush(color)
+            qp.setPen(color)
+            start, end = chunk
+            qp.drawRect(start, 0, end-start ,self.height()-1)
+            
+#         qp.setPen(QColor(12,4,244))
+#         qp.setBrush(QColor(168, 34, 3))
+        
+#         qp.drawRect(self.rect())
+#         qp.setFont(QFont('Decorative', 10))
+#         qp.drawText(event.rect(), Qt.AlignCenter, "fdafdsa")
+        qp.end()
+    
+    def dragEnterEvent(self, *args, **kwargs):
+        print "drag enter event emitted"
+        return QWidget.dragEnterEvent(self, *args, **kwargs)
+    
+    def dragLeaveEvent(self, *args, **kwargs):
+        print "drag leave event emitted"
+        return QWidget.dragLeaveEvent(self, *args, **kwargs)
+    
+    def dragMoveEvent(self, *args, **kwargs):
+        print "drag move event emitted"
+        return QWidget.dragMoveEvent(self, *args, **kwargs)
+    
+    def mouseMoveEvent(self, *args, **kwargs):
+#         print "mouse move event emitted"
+        return QWidget.mouseMoveEvent(self, *args, **kwargs)
+    
+    def mousePressEvent(self, *args, **kwargs):
+        print "mouse pressed"
+        return QWidget.mousePressEvent(self, *args, **kwargs)
 
 def cma_optimize(name): # name is unused
     sigma_0 = 1
@@ -983,8 +1073,9 @@ class Renderer(Thread):
 
 def _main():
     renderer = Renderer()
-    renderer.start()
-    gui = MyGUI(renderer)
+#     renderer.start()
+#     gui = MyGUI(renderer)
+    gui = Weight_Dialog(['a','b','c', 'd','e','f','g'], np.array([0.03, 0.2, 0.2, 0.1, 0.05, 0.4, 0.02]))
     gui.run()
     return
 
