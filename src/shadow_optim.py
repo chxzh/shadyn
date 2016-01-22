@@ -423,11 +423,12 @@ class Weight_Dialog(QDialog):
 class weight_slider(QWidget):
     def __init__(self, names, weights):
         QWidget.__init__(self)
-        self.setMinimumHeight(10)
-        self.setMaximumHeight(30)
+        self.setMinimumHeight(50)
+        self.setMaximumHeight(100)
         self.setFixedWidth(400)
         self.names = names
         self.weights = weights
+        self.bar_height = 50
         n = len(names)
         # chunk := (name, weight, color, (start, end))
         self.chunks = zip(names, weights, 
@@ -461,7 +462,7 @@ class weight_slider(QWidget):
             qp.setBrush(color)
             qp.setPen(color)
             start, end = chunk
-            qp.drawRect(start, 0, end-start ,self.height()-1)
+            qp.drawRect(start, 0, end-start, self.bar_height-1)
             
 #         qp.setPen(QColor(12,4,244))
 #         qp.setBrush(QColor(168, 34, 3))

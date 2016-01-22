@@ -389,12 +389,12 @@ def draw_a_few_cubes():
     model_mat.translate((0.5, 0, 0))
     model_mat.rotate(pi / 2, vec3(1.0, 0.5, 1.7))
     model_mat.scale(vec3(0.5))
-    view_mat = look_at(vec3(0, 2, -5),
+    view_mat = look_at(vec3(2, 1, 5),
                            vec3(0, 0, 0),
                            vec3(0, 1, 0))
     proj_mat = mat4.perspective(45, 4./3, 0.1, 100)
     model_view_inv = (view_mat * model_mat).inverse()
-    light_pos = vec3(3,3,3)
+    light_pos = vec3(0,3,0)
     MVP = proj_mat * view_mat * model_mat
     V_loc = glGetUniformLocation(program_handle, "V")
     glUniformMatrix4fv(V_loc, 1, GL_FALSE, view_mat.toList())
@@ -450,7 +450,7 @@ def draw_a_few_cubes():
     if glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE:
         raise RuntimeError("framebuffer is not okay")
     depth_proj_mat = mat4.perspective(45, 1, 1, 50)
-    depth_view_mat = look_at(light_pos, vec3(0), vec3(0,1,0))
+    depth_view_mat = look_at(light_pos, vec3(0,4,0), vec3(0,1,0))
     glUseProgram(depth_program_handle)
     depth_vert_loc = glGetAttribLocation(depth_program_handle, 
                                          "vertexPosition_modelspace")
