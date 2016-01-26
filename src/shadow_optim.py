@@ -29,7 +29,7 @@ class MyGUI(QWidget):
         left_boxes = [
                  self._init_set_target(),
                  self._init_select_method(),
-                 self._init_select_errorfunc(),
+                 self._init_select_energy(),
                  self._init_set_param()
                  ]
         for box in left_boxes:
@@ -114,7 +114,7 @@ class MyGUI(QWidget):
         # not started
         if self._optimizer == None or not self._optimizer.is_alive():
             self._optimizer = Optimizer(self.renderer)
-            # configurating the optimizer by feeding in optimizing-method and error function
+            # configurating the optimizer by feeding in optimizing-method and energy function
             if self.target_path != None:
                 self._optimizer.set_target(self.target_path)
             else:                
@@ -124,10 +124,10 @@ class MyGUI(QWidget):
                 return
             self._optimizer.set_method(self.optim_combo.currentText())
             try:
-                self._optimizer.set_error_func(*self._get_error_func_pairs())
+                self._optimizer.set_energy(*self._get_energy_pairs())
             except RuntimeWarning as rtwng:
                 msg_box = QMessageBox()
-                msg_box.setText("no error function is selected")
+                msg_box.setText("no energy function is selected")
                 msg_box.exec_()
                 return
             self._optimizer.set_finished_callback(self._on_optim_done)
@@ -198,21 +198,21 @@ class MyGUI(QWidget):
         else:
             self.armijo_check.setEnabled(False)
     
-    def _init_select_errorfunc(self):
-        self.error_func_gbox = QGroupBox("error functions", self)
+    def _init_select_energy(self):
+        self.energy_gbox = QGroupBox("energy functions", self)
         vbox = QVBoxLayout()
-        error_func_names = Optimizer.error_func_dic.keys()
-        error_func_names.sort()
-        self.errorfunc_chbox_list = []    
+        energy_names = Optimizer.energy_dic.keys()
+        energy_names.sort()
+        self.energy_chbox_list = []    
         self.weights = []    
-        for index, error_func_name in enumerate(error_func_names):
+        for index, energy_name in enumerate(energy_names):
             checkbox = QCheckBox(self)
-            checkbox.setText(error_func_name)
+            checkbox.setText(energy_name)
             vbox.addWidget(checkbox)
-            self.errorfunc_chbox_list.append(checkbox)
+            self.energy_chbox_list.append(checkbox)
             self.weights.append(0)
             checkbox.stateChanged.connect(
-                    self._on_errorfunc_state_changed_closure(index, checkbox))
+                    self._on_energy_state_changed_closure(index, checkbox))
         self.checked_num = 0
         self.weights = np.array(self.weights, dtype=float)
         hbox = QHBoxLayout()
@@ -221,12 +221,12 @@ class MyGUI(QWidget):
         hbox.addWidget(self.weight_button)
         hbox.addStretch(1)
         vbox.addLayout(hbox)
-        self.error_func_gbox.setLayout(vbox)
+        self.energy_gbox.setLayout(vbox)
         temp_box = QVBoxLayout()
-        temp_box.addWidget(self.error_func_gbox)
+        temp_box.addWidget(self.energy_gbox)
         return temp_box
     
-    def _on_errorfunc_state_changed_closure(self, index, checkbox):
+    def _on_energy_state_changed_closure(self, index, checkbox):
         def _on_state_changed(arg__1):
             # unaffected items should maintain the original balance
             # all weights sum-up to 1 except all-0
@@ -252,7 +252,7 @@ class MyGUI(QWidget):
         else:
             err_func_names = []
             cur_weights = []
-            for checkbox, weight in zip(self.errorfunc_chbox_list, self.weights):
+            for checkbox, weight in zip(self.energy_chbox_list, self.weights):
                 if checkbox.isChecked():
                     err_func_names.append(checkbox.text())
                     curweight.append(weight)
@@ -260,14 +260,14 @@ class MyGUI(QWidget):
             # TODO: finish this
         
         
-    def _get_error_func_pairs(self):
-        # return the error function selection and corresponding weights
+    def _get_energy_pairs(self):
+        # return the energy function selection and corresponding weights
         names, weights = [], []
-        for checkbox, weight in zip(self.errorfunc_chbox_list, self.weights):
+        for checkbox, weight in zip(self.energy_chbox_list, self.weights):
             if checkbox.isChecked():
                 names.append(checkbox.text())
                 weights.append(weight)
-        if len(names) == 0: raise RuntimeWarning("No error function selected")
+        if len(names) == 0: raise RuntimeWarning("No energy function selected")
         return names, weights
     
     def _on_param_updated(self):
@@ -512,7 +512,7 @@ def scipy_optimize_jac(name):
     return fmin
 
 def _get_jac(func, delta, x0):
-    # let func be the error-function and delta as the uniform delta for gradient
+    # let func be the energy function and delta as the uniform delta for gradient
     len_x = len(x0)
     def jac(x):
         fx = func(x)
@@ -593,7 +593,7 @@ class Optimizer(Thread):
         self.green_light = Lock()
         self.renderer = renderer
         self._optim_method = lambda *x: None
-        self._error_func_list = []
+        self._energy_list = []
         self.set_param = renderer.set_param
         self.get_param = renderer.get_param
         self._target_img = None
@@ -607,7 +607,7 @@ class Optimizer(Thread):
     def run(self):
         # collect params
         # build optimizer
-        err_func = self._wrap_eval(self.error_func)
+        err_func = self._wrap_eval(self.energy_func)
         if self.line_search_first:
             self.line_search_init_param(err_func)
         else:
@@ -670,13 +670,13 @@ class Optimizer(Thread):
         # this is the interface for manager
         self._optim_method = Optimizer.method_dic[name](name)
     
-    def set_error_func(self, func_names, weights):
+    def set_energy(self, func_names, weights):
         if len(func_names) != len(weights):
-            err_msg = "error function number (%d) doesn't match weight number (%d)"\
+            err_msg = "energy function number (%d) doesn't match weight number (%d)"\
                     % (len(func_names), len(weights))
             raise RuntimeError(err_msg)
         
-        self._error_func_list = zip([Optimizer.error_func_dic[name](self._target_img) \
+        self._energy_list = zip([Optimizer.energy_dic[name](self._target_img) \
                                         for name in func_names],
                                      weights)
             
@@ -694,22 +694,19 @@ class Optimizer(Thread):
         self._iter_callback = callback
         self._iter_callback_args = args
         
-    def error_func(self, x):
+    def energy_func(self, x):
         self.renderer.set_param(x)
-        self.renderer.ss_update.acquire()
-        self.renderer.ss_ready.acquire()
-        self.renderer.ss_update.release()
-        img = self.renderer.snapshot
+        img = self.renderer.acquire_snapshot()
         self._iter_callback(*self._iter_callback_args)
-        return sum([weight*(func(img)) for func, weight in self._error_func_list])
+        return sum([weight*(func(img)) for func, weight in self._energy_list])
 
     '''
-    error_func_dic is a static attribute of optimizer, which maps error
+    energy_dic is a static attribute of optimizer, which maps energy
     function names to a callable instance. The mapped callable is a closure
     that takes the target image as input, and return a method calculating the
-    error function value based on input image.
+    energy function value based on input image.
     '''
-    error_func_dic = {
+    energy_dic = {
                 "XOR comparison": _xor_closure,
                 "first moments (normalized)": _sq_diff_closure(_get_fst_moments),
                 "secondary moments (normalized)": _sq_diff_closure(_get_sec_moments)
@@ -975,7 +972,7 @@ class Renderer(Thread):
     
     # obsolete method
     def _get_jac(self, func, delta, x0):
-        # let func be the error-function and delta as the uniform delta for gradient
+        # let func be the energy-function and delta as the uniform delta for gradient
         len_x = len(x0)
         def jac(x):
             fx = func(x)
@@ -989,10 +986,10 @@ class Renderer(Thread):
         return jac
     
     def acquire_snapshot(self):
-        
         self.ss_update.acquire()
         self.ss_ready.acquire()
         self.ss_update.release()
+        return self.snapshot
     
     # obsolete method
     def _optim_obj_sec_moment(self, x):
