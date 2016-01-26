@@ -453,6 +453,7 @@ class weight_slider(QWidget):
             yield (roundint(start), roundint(end)-1)
             start = end
     
+    # overriding the widget paintEvent()
     def paintEvent(self, event):
         qp = QPainter()
         qp.begin(self)
@@ -986,6 +987,12 @@ class Renderer(Thread):
                 grad[i] = fx_t - fx
             return grad / delta
         return jac
+    
+    def acquire_snapshot(self):
+        
+        self.ss_update.acquire()
+        self.ss_ready.acquire()
+        self.ss_update.release()
     
     # obsolete method
     def _optim_obj_sec_moment(self, x):
