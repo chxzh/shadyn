@@ -19,7 +19,7 @@ import sys
 import random
 from astropy.convolution.boundary_extend import DTYPE
 import log
-log.init("example.log")
+# log.init()
 
 qt_app = QApplication(sys.argv)
 class MyGUI(QWidget):
@@ -606,6 +606,7 @@ class Optimizer(Thread):
         self.line_search_first = False        
         self._method_name = "unset"
     
+    @log.task_log
     def run(self):
         # collect params
         # build optimizer

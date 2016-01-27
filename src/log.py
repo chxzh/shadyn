@@ -1,8 +1,9 @@
 # my logging module
 import logging
-_file_name = ""
-logging.basicConfig()
-_logger = None
+
+filename="EXAMPLE.log"; level=logging.DEBUG; format='%(asctime)s %(message)s'
+logging.basicConfig(filename=filename, level=level, format=format)
+_logger = logging.getLogger()
 
 def energy_term_log(energy_func):
     # decorator for energy function in optimization
@@ -19,23 +20,23 @@ def energy_sum_log(sum_func):
         _logger.info("evaluating on x: {x}".format(x=x))
         res = sum_func(optimizer, x)
         _logger.info("total: {res}".format(res=res))
+        return res
     return inner
 
-def optimtask_log(run):
+def task_log(run):
     # decorator for run() in optimizer
     def inner(optimizer):
         _logger.info("starting optimization with configuration of:")
-        _logger.info("method - {name}", name=optimizer._method_name)
+        _logger.info("method - {name}".format(name=optimizer._method_name))
         _logger.info("energies:")
         for func, name, weight in optimizer._energy_list:
             # TODO: bad accessing, needs refactoring
-            _logger.info("energy function - {name}, weight - {weight}",
-                         name=name, weight=weight)
-        run()
+            _logger.info("energy function - {name}, weight - {weight}".format(name=name, weight=weight))
+        run(optimizer)
         return
     return inner
 
-def init(filename, level=logging.DEBUG, format='%(asctime)s %(message)s'):
+def init(filename="EXAMPLE.log", level=logging.DEBUG, format='%(asctime)s %(message)s'):
     _file_name=filename
     logging.basicConfig(filename=filename, level=level, format=format)
     global _logger
