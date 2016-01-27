@@ -7,7 +7,7 @@ _logger = None
 def energy_term_log(energy_func):
     # decorator for energy function in optimization
     def inner(optimizer, x): # x is expected to be a 1-d numpy array
-        res = energy_func(x)
+        res = energy_func(optimizer, x)
         msg = "each terms: "+", ".join([str(y) for y,w,n in res])
         _logger.info(msg)
         return res
@@ -35,7 +35,8 @@ def optimtask_log(run):
         return
     return inner
 
-def init(filename, level=logging.DEBUG):
+def init(filename, level=logging.DEBUG, format='%(asctime)s %(message)s'):
     _file_name=filename
-    logging.basicConfig(filename=filename, level=level)
-    _logger = logging.getLogger(name)
+    logging.basicConfig(filename=filename, level=level, format=format)
+    global _logger
+    _logger = logging.getLogger()

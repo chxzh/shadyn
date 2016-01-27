@@ -18,6 +18,8 @@ from threading import Thread, Lock
 import sys
 import random
 from astropy.convolution.boundary_extend import DTYPE
+import log
+log.init("example.log")
 
 qt_app = QApplication(sys.argv)
 class MyGUI(QWidget):
@@ -81,7 +83,6 @@ class MyGUI(QWidget):
                                         "image file (*.png *.jpg *.bmp)")
         self.target_path = filename
         self.target_path_label.setText(filename)
-        self.renderer.set_target_image(filename)        
         self.target_preview_label.setPixmap(QPixmap(filename))
         self.target_preview_label.show()
         # TODO: deal with cases when the image is unfit
@@ -114,7 +115,7 @@ class MyGUI(QWidget):
         # not started
         if self._optimizer == None or not self._optimizer.is_alive():
             self._optimizer = Optimizer(self.renderer)
-            # configurating the optimizer by feeding in optimizing-method and energy function
+            # configuring the optimizer by feeding in optimizing-method and energy function
             if self.target_path != None:
                 self._optimizer.set_target(self.target_path)
             else:                
@@ -698,12 +699,14 @@ class Optimizer(Thread):
         self._iter_callback_args = args
     
     def _sum(f):
+        @log.energy_sum_log
         def inner(cls, x):
             res = f(cls, x)
             return sum([w*y for y, w, n in res])
         return inner
     
     @_sum
+    @log.energy_term_log
     def energy_func(self, x):
         self.renderer.set_param(x)
         img = self.renderer.acquire_snapshot()
@@ -879,12 +882,12 @@ class Renderer(Thread):
         glEnable(GL_DEPTH_TEST)
         glDepthFunc(GL_LESS)
         glEnable(GL_CULL_FACE)
-        self.image_target = None
         
         _init_X_Y(self.window.width, self.window.height)
         self._X = np.arange(self.window.width).reshape(1,self.window.width)
         self._Y = np.arange(self.window.height).reshape(self.window.height,1)
     
+    # obsolete
     def set_target_image(self, filepath):
         self.image_target = Image.open(filepath)
         self.image_target = self.image_target.convert("L")
