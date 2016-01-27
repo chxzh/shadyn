@@ -696,12 +696,19 @@ class Optimizer(Thread):
     def set_iter_callback(self, callback, *args):
         self._iter_callback = callback
         self._iter_callback_args = args
-        
+    
+    def _sum(f):
+        def inner(cls, x):
+            res = f(cls, x)
+            return sum([w*y for y, w, n in res])
+        return inner
+    
+    @_sum
     def energy_func(self, x):
         self.renderer.set_param(x)
         img = self.renderer.acquire_snapshot()
         self._iter_callback(*self._iter_callback_args)
-        return sum([weight*(func(img)) for func, name, weight in self._energy_list])
+        return [(func(img), weight, name) for func, name, weight in self._energy_list]
 
     '''
     energy_dic is a static attribute of optimizer, which maps energy
@@ -1081,9 +1088,9 @@ class Renderer(Thread):
 
 def _main():
     renderer = Renderer()
-#     renderer.start()
-#     gui = MyGUI(renderer)
-    gui = Weight_Dialog(['a','b','c', 'd','e','f','g'], np.array([0.03, 0.2, 0.2, 0.1, 0.05, 0.4, 0.02]))
+    renderer.start()
+    gui = MyGUI(renderer)
+#     gui = Weight_Dialog(['a','b','c', 'd','e','f','g'], np.array([0.03, 0.2, 0.2, 0.1, 0.05, 0.4, 0.02]))
     gui.run()
     return
 
