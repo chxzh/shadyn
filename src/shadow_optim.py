@@ -602,7 +602,8 @@ class Optimizer(Thread):
         self._finished_callback_args = []
         self._iter_callback = lambda *args: None
         self._iter_callback_args = []
-        self.line_search_first = False
+        self.line_search_first = False        
+        self._method_name = "unset"
     
     def run(self):
         # collect params
@@ -669,6 +670,7 @@ class Optimizer(Thread):
     def set_method(self, name):
         # this is the interface for manager
         self._optim_method = Optimizer.method_dic[name](name)
+        self._method_name = name
     
     def set_energy(self, func_names, weights):
         if len(func_names) != len(weights):
@@ -678,7 +680,8 @@ class Optimizer(Thread):
         
         self._energy_list = zip([Optimizer.energy_dic[name](self._target_img) \
                                         for name in func_names],
-                                     weights)
+                                    func_names,
+                                    weights)
             
     def set_target(self, image_path):
         # TODO: finish setting the target image
@@ -698,7 +701,7 @@ class Optimizer(Thread):
         self.renderer.set_param(x)
         img = self.renderer.acquire_snapshot()
         self._iter_callback(*self._iter_callback_args)
-        return sum([weight*(func(img)) for func, weight in self._energy_list])
+        return sum([weight*(func(img)) for func, name, weight in self._energy_list])
 
     '''
     energy_dic is a static attribute of optimizer, which maps energy
