@@ -41,3 +41,35 @@ def init(filename="EXAMPLE.log", level=logging.DEBUG, format='%(asctime)s %(mess
     logging.basicConfig(filename=filename, level=level, format=format)
     global _logger
     _logger = logging.getLogger()
+
+# all these customized wrapping-capable loggers shall be singletons
+class Energy_sum_logger(logging.Logger):
+    def __init__(self):
+        pass
+    
+    # called as a decorator
+    def __call__(self, f):
+        return f
+    
+    # TODO: provide interface to modify configuration at runtime
+
+
+class Energy_term_logger(logging.Logger):
+    def __init__(self):
+        pass
+    
+    # called as a decorator
+    def __call__(self, f):
+        return f
+    
+    # TODO: provide interface to modify configuration at runtime
+
+class Task_logger(logging.Logger):
+    def __init__(self):
+        pass
+    
+    # called as a decorator
+    def __call__(self, f):
+        return f
+    
+    # TODO: provide interface to modify configuration at runtime
