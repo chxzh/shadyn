@@ -513,6 +513,7 @@ def scipy_optimize_jac(name):
     return fmin
 
 def _get_jac(func, delta, x0):
+    # a gradient approximated jacobian computation
     # let func be the energy function and delta as the uniform delta for gradient
     len_x = len(x0)
     def jac(x):
@@ -608,7 +609,15 @@ class Optimizer(Thread):
     
     @log.task_log
     def run(self):
-        # collect params
+        # check params
+        if self._target_img == None:
+            raise RuntimeError("Target image missing")
+        if len(self._energy_list) == 0:
+            raise RuntimeError("No energy function selected")
+        if self._method_name == "unset":
+            raise RuntimeError("Method unset")
+        if self.renderer == None:
+            raise RuntimeError("Renderer missing")
         # build optimizer
         err_func = self._wrap_eval(self.energy_func)
         if self.line_search_first:
