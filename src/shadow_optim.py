@@ -19,6 +19,7 @@ import sys
 import random
 from astropy.convolution.boundary_extend import DTYPE
 import log
+from functools import wraps
 # log.init()
 
 qt_app = QApplication(sys.argv)
@@ -710,6 +711,7 @@ class Optimizer(Thread):
     
     def _sum(f):
         @log.energy_sum_log
+        @wraps(f)
         def inner(cls, x):
             res = f(cls, x)
             return sum([w*y for y, w, n in res])
