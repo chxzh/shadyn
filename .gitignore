@@ -4,3 +4,4 @@ AntTweakBar.dll
 *.pyc
 *.prefs
 *.dat
+src/EXAMPLE.log
