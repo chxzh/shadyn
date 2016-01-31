@@ -607,6 +607,8 @@ class Optimizer(Thread):
         self._iter_callback_args = []
         self.line_search_first = False        
         self._method_name = "unset"
+        self._eval_term_records = ()
+        self._eval_sum_record = None
     
     @log.task_log
     def run(self):
@@ -630,9 +632,6 @@ class Optimizer(Thread):
                            f=err_func)
         self._finished_callback(*self._finished_callback_args)
         
-#         wrapped = self._wrap_eval(self.renderer.optimize)
-#         wrapped(self.renderer.get_param())
-
     def line_search_init_param(self, func):
         x = self.renderer.get_param()
         jac = _get_jac(func=func, delta=0.005, x0=x)
@@ -694,6 +693,8 @@ class Optimizer(Thread):
                                         for name in func_names],
                                     func_names,
                                     weights)
+        self._eval_term_records = tuple([] for i in func_names)
+        self._eval_sum_record = []
             
     def set_target(self, image_path):
         # TODO: finish setting the target image
@@ -709,6 +710,26 @@ class Optimizer(Thread):
         self._iter_callback = callback
         self._iter_callback_args = args
     
+    def _record_term(f):
+        # decorator that records each term of each evaluation
+        @wraps(f)
+        def inner(cls, x):
+            res = f(cls, x)
+            for record, res_term in zip(cls._eval_term_records, res):
+                y, w, n = res_term
+                record.append(y)
+            return res
+        return inner
+    
+    def _record_sum(f):
+        # decorator that records sum of all terms of each evaluation
+        @wraps(f)
+        def inner(cls, x):
+            res = f(cls, x)
+            cls._eval_sum_record.append(res)
+            return res
+        return inner
+        
     def _sum(f):
         @log.energy_sum_log
         @wraps(f)
@@ -717,8 +738,10 @@ class Optimizer(Thread):
             return sum([w*y for y, w, n in res])
         return inner
     
+    @_record_sum
     @_sum
     @log.energy_term_log
+    @_record_term
     def energy_func(self, x):
         self.renderer.set_param(x)
         img = self.renderer.acquire_snapshot()
