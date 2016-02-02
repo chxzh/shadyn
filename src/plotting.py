@@ -1,8 +1,13 @@
 import matplotlib.pyplot as plt
+from functools import wraps
+from IPython.core.magic_arguments import kwds
 try:
    import cPickle as pickle
 except:
    import pickle
+
+PLOT_ENABLED = True
+
 class Plotter():
     def __init__(self, file_name):
         self._eval_term_records = ()
@@ -35,4 +40,59 @@ class Plotter():
         plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3,
                ncol=2, borderaxespad=0.)
         plt.savefig(self._fname+'.png')
-    
+
+
+def conditional(condition):
+    """Meta-decorator that enables the decorated decorator only when
+    the given condition is met.
+    """
+    def decorate(other_dec):
+        if condition:
+            return other_dec
+        else:
+            def empty_decorator(decorated):
+                return decorated
+            return empty_decorator
+    return decorate
+
+@conditional(PLOT_ENABLED)
+def plot_terms(f):
+    """Decorator for energy (terms) function of optimizer, records terms of
+    every evaluation to plot"""
+    # needs to inject a plotter attribute into Optimizer instance
+    @wraps(f)
+    def inner(cls, *args, **kwds):
+        res = f(cls, *args, **kwds)
+        return res
+    return inner
+
+@conditional(PLOT_ENABLED)
+def plot_sums(f):
+    """Decorator for sum of energy (sum) function of optimizer, """
+    # needs a way to inject an attribute of plotter into the Optimizer instance
+    @wraps(f)
+    def inner(cls, *args, **kwds):
+        y = f(cls, *args, **kwds)
+        cls.plotter.record_sum(y)
+        return y
+    return inner
+
+@conditional(PLOT_ENABLED)
+def plot_task(f):
+    """Decorator for run() of optimizer, plot and save """
+    @wraps(f)
+    def inner(cls, *args, **kwds):
+        res = f(cls, *args, **kwds)
+        cls.plotter.plot_result()
+        return res
+    return inner
+     
+def attach_plotter(optimizer, plotter):
+    if PLOT_ENABLED: setattr(optimizer, 'plotter', plotter)
+
+
+
+
+
+
+
