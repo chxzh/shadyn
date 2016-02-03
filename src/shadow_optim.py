@@ -18,7 +18,7 @@ from threading import Thread, Lock
 import sys
 import random
 from astropy.convolution.boundary_extend import DTYPE
-import log
+import log, plotting
 from functools import wraps
 # log.init()
 
@@ -615,6 +615,7 @@ class Optimizer(Thread):
         self.result = None
     
     @log.task_log
+    @plotting.plot_task
     def run(self):
         # check params
         if self._target_img == None:
@@ -635,7 +636,7 @@ class Optimizer(Thread):
         self.result = self._optim_method(x=self.renderer.get_param(),
                            f=err_func)
         self._finished_callback(*self._finished_callback_args)
-        return result
+        return self.result
         
     def line_search_init_param(self, func):
         x = self.renderer.get_param()
@@ -688,6 +689,7 @@ class Optimizer(Thread):
         self._optim_method = Optimizer.method_dic[name](name)
         self._method_name = name
     
+    @plotting.init_plot
     def set_energy(self, func_names, weights):
         if len(func_names) != len(weights):
             err_msg = "energy function number (%d) doesn't match weight number (%d)"\
@@ -743,10 +745,10 @@ class Optimizer(Thread):
             return sum([w*y for y, w, n in res])
         return inner
     
-    @_record_sum
+    @plotting.plot_sum
     @_sum
     @log.energy_term_log
-    @_record_term
+    @plotting.plot_terms
     def energy_func(self, x):
         self.renderer.set_param(x)
         img = self.renderer.acquire_snapshot()
