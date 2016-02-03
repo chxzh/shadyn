@@ -498,19 +498,22 @@ class weight_slider(QWidget):
 def cma_optimize(name): # name is unused
     sigma_0 = 1
     def cma_fmin(f, x):
-        return cma.fmin(objective_function=f, x0=x, sigma0=sigma_0)
+        res = cma.fmin(objective_function=f, x0=x, sigma0=sigma_0)
+        return res[0], res[1]
     return cma_fmin
 
 def scipy_optimize(name):
     def fmin(f, x):
-        return optimize.minimize(fun=f, x0=x, method=name)
+        res = optimize.minimize(fun=f, x0=x, method=name)
+        return res.x, res.fun
     return fmin
 
 def scipy_optimize_jac(name):
     delta = 0.005        
     def fmin(f, x):
-        return optimize.minimize(fun=f, x0=x, method=name,
+        res = optimize.minimize(fun=f, x0=x, method=name,
                     jac=_get_jac(f, delta, x))
+        return res.x, res.fun
     return fmin
 
 def _get_jac(func, delta, x0):
@@ -609,6 +612,7 @@ class Optimizer(Thread):
         self._method_name = "unset"
         self._eval_term_records = ()
         self._eval_sum_record = None
+        self.result = None
     
     @log.task_log
     def run(self):
@@ -628,9 +632,10 @@ class Optimizer(Thread):
         else:
             pass
         # wrap optimizer with green_light
-        self._optim_method(x=self.renderer.get_param(),
+        self.result = self._optim_method(x=self.renderer.get_param(),
                            f=err_func)
         self._finished_callback(*self._finished_callback_args)
+        return result
         
     def line_search_init_param(self, func):
         x = self.renderer.get_param()
