@@ -6,3 +6,5 @@ AntTweakBar.dll
 *.dat
 src/EXAMPLE.log
 /res/
+
+*.log
