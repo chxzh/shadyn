@@ -5,3 +5,4 @@ AntTweakBar.dll
 *.prefs
 *.dat
 src/EXAMPLE.log
+/res/
