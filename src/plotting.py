@@ -12,12 +12,14 @@ class Plotter():
     def __init__(self, file_name):
         self._eval_term_records = ()
         self._eval_sum_records = None
+        self._x_records = None
         self._fname = file_name
     
     def set_param(self, func_names):
         self._term_names = func_names[:]
         self._eval_term_records = tuple([] for name in func_names)
         self._eval_sum_records = []
+        self._x_records = []
    
     def record_terms(self, ywn_shashlik):
         for record, ywn in zip(self._eval_term_records, ywn_shashlik):
@@ -27,12 +29,17 @@ class Plotter():
     def record_sum(self, y):
         self._eval_sum_records.append(y)
     
+    def record_x(self, x):
+        self._x_records.append(x)
+    
     def plot_result(self):
         # pickle the result for later availability
         with open(self._fname+'.terms', 'wb') as handle:
             pickle.dump(self._eval_term_records, handle)
         with open(self._fname+'.sums', 'wb') as handle:
             pickle.dump(self._eval_sum_records, handle)
+        with open(self._fname+'.xs', 'wb') as handle:
+            pickle.dump(self._x_records, handle)
         # plot the things
         plt.plot(self._eval_sum_records, label="sum")
         for term, name in zip(self._eval_term_records, self._term_names):
@@ -40,6 +47,7 @@ class Plotter():
         plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3,
                ncol=2, borderaxespad=0.)
         plt.savefig(self._fname+'.png')
+        plt.close()
 
 
 def conditional(condition):
@@ -72,8 +80,9 @@ def plot_sum(f):
     of all terms of each evaluation"""
     # needs a way to inject an attribute of plotter into the Optimizer instance
     @wraps(f)
-    def inner(cls, *args, **kwds):
-        y = f(cls, *args, **kwds)
+    def inner(cls, x):
+        y = f(cls, x)
+        cls.plotter.record_x(x)
         cls.plotter.record_sum(y)
         return y
     return inner
