@@ -3,7 +3,7 @@ import logging
 from functools import wraps
 from astropy.logger import Logger
 
-def init(filename="EXAMPLE.log", level=logging.DEBUG, format='%(asctime)s %(message)s'):
+def init(filename="..\\EXP.log", level=logging.DEBUG, format='%(asctime)s %(message)s'):
     _file_name=filename
     hdl = logging.FileHandler(filename)
     fmt = logging.Formatter(format)
@@ -21,9 +21,9 @@ class Energy_sum_logger(logging.Logger):
     def __call__(self, get_energy):
         @wraps(get_energy)
         def wrapper(optimizer, x):
-            self.log(self.level, "evaluating on x: {x}".format(x=x))
+#             self.log(self.level, "evaluating on x: {x}".format(x=x))
             res = get_energy(optimizer, x)
-            self.log(self.level, "total: {res}".format(res=res))
+#             self.log(self.level, "total: {res}".format(res=res))
             return res
         return wrapper
     
@@ -39,8 +39,8 @@ class Energy_term_logger(logging.Logger):
         @wraps(get_energy_terms)
         def wrapper(*args, **kwds):
             res = get_energy_terms(*args, **kwds)
-            msg = "each terms: "+", ".join([str(y) for y,w,n in res])
-            self.log(self.level, msg)
+#             msg = "each terms: "+", ".join([str(y) for y,w,n in res])
+#             self.log(self.level, msg)
             return res
         return wrapper
     
