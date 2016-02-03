@@ -17,7 +17,7 @@ class Plotter():
     def set_param(self, func_names):
         self._term_names = func_names[:]
         self._eval_term_records = tuple([] for name in func_names)
-        self._eval_term_records = []
+        self._eval_sum_records = []
    
     def record_terms(self, ywn_shashlik):
         for record, ywn in zip(self._eval_term_records, ywn_shashlik):
@@ -67,8 +67,9 @@ def plot_terms(f):
     return inner
 
 @conditional(PLOT_ENABLED)
-def plot_sums(f):
-    """Decorator for sum of energy (sum) function of optimizer, """
+def plot_sum(f):
+    """Decorator for sum of energy (sum) function of optimizer, records the sum
+    of all terms of each evaluation"""
     # needs a way to inject an attribute of plotter into the Optimizer instance
     @wraps(f)
     def inner(cls, *args, **kwds):
@@ -79,16 +80,27 @@ def plot_sums(f):
 
 @conditional(PLOT_ENABLED)
 def plot_task(f):
-    """Decorator for run() of optimizer, plot and save """
+    """Decorator for run() of optimizer, plot and save the things"""
     @wraps(f)
     def inner(cls, *args, **kwds):
         res = f(cls, *args, **kwds)
         cls.plotter.plot_result()
         return res
     return inner
+
+@conditional(PLOT_ENABLED)
+def init_plot(set_energy):
+    """Decorator for set_energy() of optimizer, initialize the records"""
+    @wraps(set_energy)
+    def inner(cls, func_names, weights):
+        cls.plotter.set_param(func_names)
+        res = set_energy(cls, func_names, weights)
+        return res
+    return inner
      
 def attach_plotter(optimizer, plotter):
     if PLOT_ENABLED: setattr(optimizer, 'plotter', plotter)
+    optimizer.plotter.set_param
 
 
 
