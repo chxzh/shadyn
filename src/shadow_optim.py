@@ -791,6 +791,9 @@ class Renderer(Thread):
 
     class _Item:  # a temporary holder of attributes and uniforms
         pass
+    
+    class _Model: # a holder of obj, buffers and
+        pass
 
     class _Window:  # a windows attribute holder
         pass
@@ -871,6 +874,7 @@ class Renderer(Thread):
                                    vec3(0, 0, 0),
                                    vec3(0, 0, -1))
         self.cam_cap.proj_mat = self.cam_obs.proj_mat = mat4.perspective(45, 4. / 3, 0.1, 100)
+        self.model_view_inv = mat4(1.0) 
         self.model_view_inv = (self.cam_obs.view_mat * self.cube.model_mat).inverse()
     #     light_pos = vec3(2,1,0)
     #     light_pos = vec3(2,2,2)
@@ -951,6 +955,7 @@ class Renderer(Thread):
         self.param_lock = Lock()
         self._init_finished_lock = Lock()
         self._init_finished_lock.acquire()
+        self._models = []
 
     def draw(self, x):
 #         self.set_param(x)
@@ -970,6 +975,7 @@ class Renderer(Thread):
         glUseProgram(self.program_handle)
         glUniform3f(self.light_pos_loc, *self.light_pos)
         model_view_inv = (self.cam_obs.view_mat * self.cube.model_mat).inverse()
+        self.model_view_inv = (self.cam_obs.view_mat * self.cube.model_mat).inverse()
         glUniformMatrix4fv(self.MVint_loc, 1, GL_TRUE, self.model_view_inv.toList())
         glUniformMatrix4fv(self.cube.M_loc, 1, GL_FALSE, self.cube.model_mat.toList())
         self.cube.MVP = self.cam_obs.proj_mat * self.cam_obs.view_mat * self.cube.model_mat
