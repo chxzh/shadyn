@@ -29,8 +29,8 @@ class Renderer(Thread):
         return mat4(shad_mat.astype(np.float32).T.tolist())
 
     class _Item:  # a temporary holder of attributes and uniforms
-        def __init__(self, item):
-            self.item = item
+        def __init__(self, model):
+            self.model = model
             self.position = vec3(0,0,0)
             self.orientation = vec3(0,0,0)
             self.scale = vec3(1,1,1)
@@ -78,7 +78,16 @@ class Renderer(Thread):
         self.cube_model = self._Model(Object("../obj/cube.obj"))
 #         self.cube.obj = Object("../obj/cube.obj")
         self.cube = self._Item(self.cube_model)
+        self.cube.scale = vec3(0.6, 0.6, 0.6)
         self._items.append(self.cube)
+        small_cube = self._Item(self.cube_model)
+        small_cube.scale = vec3(0.2,0.2,0.2)
+        small_cube.position = vec3(0.7, 0.,0.7)
+        self._items.append(small_cube)
+        medium_cube = self._Item(self.cube_model)
+        medium_cube.scale = vec3(0.4,0.4,0.4)
+        medium_cube.position = vec3(-0.7, 0.,0.7)
+        self._items.append(medium_cube)
         # initialize VAO
         self.vao_handle = glGenVertexArrays(1)
         glBindVertexArray(self.vao_handle)
@@ -146,7 +155,7 @@ class Renderer(Thread):
         glUniform3f(self.light_pos_loc,
                     self.light_pos.x, self.light_pos.y, self.light_pos.z)
         self.MVP_loc = glGetUniformLocation(self.program_handle, "MVP")
-        self.cube.MVP = mat4(1)
+#         self.cube.MVP = mat4(1)
         self.M_loc = glGetUniformLocation(self.program_handle, "M")
         self.MVint_loc = glGetUniformLocation(self.program_handle, "MVint")
 
@@ -243,7 +252,7 @@ class Renderer(Thread):
             glUniformMatrix4fv(self.M_loc, 1, GL_FALSE, item.model_mat().toList())
             MVP = self.cam_obs.proj_mat * self.cam_obs.view_mat * item.model_mat()
             glUniformMatrix4fv(self.MVP_loc, 1, GL_FALSE, MVP.toList())
-            glDrawElements(GL_TRIANGLES, len(self.cube_model.obj.indices),
+            glDrawElements(GL_TRIANGLES, len(item.model.obj.indices),
                             GL_UNSIGNED_SHORT, None);
         MVint = (self.cam_obs.view_mat * self.floor.model_mat()).inverse()
         glUniformMatrix4fv(self.MVint_loc, 1, GL_TRUE, MVint.toList())
@@ -251,30 +260,34 @@ class Renderer(Thread):
         glUniformMatrix4fv(self.M_loc, 1, GL_FALSE, M.toList())
         MVP = self.cam_obs.proj_mat * self.cam_obs.view_mat * M
         glUniformMatrix4fv(self.MVP_loc, 1, GL_FALSE, MVP.toList())
-        glDrawElements(GL_TRIANGLES, len(self.cube_model.obj.indices),
+        glDrawElements(GL_TRIANGLES, len(self.floor.model.obj.indices),
                         GL_UNSIGNED_SHORT, None)
         glDisable(GL_CULL_FACE)
+        # draw the projected shadows
         glUseProgram(self.shadow_program_handle)
-        glUniformMatrix4fv(self.shadow.MsVP_loc, 1, GL_FALSE,
-               (self.shadow.VP_mat * self.shadow.shaject_mat * self.cube.model_mat()).toList())
-        glDrawElements(GL_TRIANGLES, len(self.cube_model.obj.indices),
-                        GL_UNSIGNED_SHORT, None)
+        for item in self._items:
+            glUniformMatrix4fv(self.shadow.MsVP_loc, 1, GL_FALSE,
+                   (self.shadow.VP_mat * self.shadow.shaject_mat * item.model_mat()).toList())
+            glDrawElements(GL_TRIANGLES, len(item.model.obj.indices),
+                            GL_UNSIGNED_SHORT, None)
 
 
         glViewport(self.window.width, 0, self.window.width, self.window.height)
 
         glDisable(GL_CULL_FACE)
         glUseProgram(self.basic_program_handle)
-        glDrawElements(GL_TRIANGLES, len(self.cube_model.obj.indices),
+        glDrawElements(GL_TRIANGLES, len(self.floor.model.obj.indices),
                         GL_UNSIGNED_SHORT, None)
+        
         glUseProgram(self.shadow_program_handle)
-        glUniformMatrix4fv(self.shadow.MsVP_loc, 1, GL_FALSE,
-               (self.shadow.VP_mat_top * self.shadow.shaject_mat * self.cube.model_mat()).toList())
-
-#         glUniformMatrix4fv(shadow_M_loc, 1, GL_FALSE, model_mat.toList())
-#         glUniformMatrix4fv(shadow_VP_loc, 1, GL_FALSE, VP_mat_top.toList())
-        glDrawElements(GL_TRIANGLES, len(self.cube_model.obj.indices),
-                        GL_UNSIGNED_SHORT, None)
+        for item in self._items:
+            glUniformMatrix4fv(self.shadow.MsVP_loc, 1, GL_FALSE,
+                   (self.shadow.VP_mat_top * self.shadow.shaject_mat * item.model_mat()).toList())
+    
+    #         glUniformMatrix4fv(shadow_M_loc, 1, GL_FALSE, model_mat.toList())
+    #         glUniformMatrix4fv(shadow_VP_loc, 1, GL_FALSE, VP_mat_top.toList())
+            glDrawElements(GL_TRIANGLES, len(item.model.obj.indices),
+                            GL_UNSIGNED_SHORT, None)
         # Swap front and back buffers
         glfw.swap_buffers(self.window.handle)
         if self.ss_update.locked():
