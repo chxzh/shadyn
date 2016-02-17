@@ -295,54 +295,12 @@ class Renderer(Thread):
             self.ss_ready.release()
         glfw.poll_events()
 
-    # obsolete method
-    def optimize(self, x=None):
-        if x == None:
-            x = self.cube.position
-#         res = optimize.minimize(fun=self._optim_obj_sec_moment, x0=x, method='BFGS', 
-#                                 callback=None, bounds=((0, 2.5), (0, 2.5), (None, None)),
-#                                 jac=self._get_jac(self._optim_obj_sec_moment, 0.005, x))
-#         x_res = res.x
-        res = cma.fmin(objective_function=self._optim_obj_sec_moment, 
-             x0=x,
-             sigma0=1)    
-        x_res = res[0]
-        self.set_param(x_res)
-        print "optm ends"
-    
-    # obsolete method
-    def _get_jac(self, func, delta, x0):
-        # let func be the energy-function and delta as the uniform delta for gradient
-        len_x = len(x0)
-        def jac(x):
-            fx = func(x)
-            grad = np.zeros(len_x)        
-            for i in range(len_x):
-                x_t = np.zeros(len_x)
-                x_t[i] = delta
-                fx_t = func(x+x_t)
-                grad[i] = fx_t - fx
-            return grad / delta
-        return jac
-    
     def acquire_snapshot(self):
         self.ss_update.acquire()
         self.ss_ready.acquire()
         self.ss_update.release()
         return self.snapshot
-    
-    # obsolete method
-    def _optim_obj_sec_moment(self, x):
-        self.set_param(x)
-        self.ss_update.acquire()
-        self.ss_ready.acquire()
-        self.ss_update.release()
-        image = self.snapshot
-        M_2 = self._get_moments(image)
-        res = ((self.Mt_2 - M_2)**2).sum()
-        print res, x
-        return res
-    
+        
     def _save_snapshot(self):
         glfw.swap_buffers(self.window.handle)
         buff = glReadPixels(self.window.width, 0, self.window.width, 
@@ -354,25 +312,6 @@ class Renderer(Thread):
         im = im.convert("L")
         self.snapshot = im
     
-    # obsolete method
-    def _get_moments(self, image):
-        # image should be a gray scale Image object
-        img = 1 - np.array(image.getdata()) / 128 # turn white to 0 and black to 1
-        # using 128 in case of gray
-        img = img.astype(np.int8)
-        img = img.reshape(self.window.height, self.window.width)
-        M_00 = float(img.sum())        
-        M_10 = (self._X * img).sum()
-        M_01 = (img * self._Y).sum()
-        m_10 = M_10 / M_00 if M_00 else 0
-        m_01 = M_01 / M_00 if M_00 else 0
-        X_offset = self._X-m_10
-        Y_offset = self._Y-m_01
-        m_20 = ((X_offset**2)*img).sum() / M_00 if M_00 else 0
-        m_02 = (img*(Y_offset**2)).sum() / M_00 if M_00 else 0
-        m_11 = (X_offset*img*Y_offset).sum() / M_00 if M_00 else 0
-        return np.array([m_10, m_01]), np.array([m_20, m_11, m_02])
-
     def set_param(self, x):
         self.param_lock.acquire()
         self.cube.model_mat = mat4(1.0)
