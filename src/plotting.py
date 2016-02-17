@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 from functools import wraps
 from IPython.core.magic_arguments import kwds
+from _imaging import path
 try:
    import cPickle as pickle
 except:
@@ -9,11 +10,17 @@ except:
 PLOT_ENABLED = True
 
 class Plotter():
-    def __init__(self, file_name):
+    def __init__(self, path, time_stamp):
         self._eval_term_records = ()
         self._eval_sum_records = None
         self._x_records = None
-        self._fname = file_name
+        self._path = path
+        self._time_stamp = time_stamp
+        self._fname = path+'\\'+time_stamp
+        self._method_name = None
+    
+    def set_method(self, method_name):
+        self._method_name = method_name
     
     def set_param(self, func_names):
         self._term_names = func_names[:]
@@ -44,10 +51,14 @@ class Plotter():
         plt.plot(self._eval_sum_records, label="sum")
         for term, name in zip(self._eval_term_records, self._term_names):
             plt.plot(term, label=name)
-        plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3,
+        plt.legend(bbox_to_anchor=(0., 1.05, 1., .102), loc=3,
                ncol=2, borderaxespad=0.)
+        plt.title(self._method_name, y=-0.1)
+        plt.savefig(self._path+"\\..\\"+self._time_stamp+'.png')
         plt.savefig(self._fname+'.png')
         plt.close()
+        
+    
 
 
 def conditional(condition):
@@ -71,6 +82,7 @@ def plot_terms(f):
     @wraps(f)
     def inner(cls, *args, **kwds):
         res = f(cls, *args, **kwds)
+        cls.plotter.record_terms(res)
         return res
     return inner
 
@@ -93,7 +105,10 @@ def plot_task(f):
     @wraps(f)
     def inner(cls, *args, **kwds):
         res = f(cls, *args, **kwds)
+        cls.plotter.set_method(cls._method_name) # TODO: terrible accessing
         cls.plotter.plot_result()
+        img = cls.renderer.acquire_snapshot()
+        img.save(cls.plotter._path + "\\final_result_snapshot.png") # TODO: ehh
         return res
     return inner
 
