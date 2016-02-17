@@ -314,13 +314,14 @@ class Renderer(Thread):
     
     def set_param(self, x):
         self.param_lock.acquire()
-        self.cube.model_mat = mat4(1.0)
-        self.cube.model_mat.translate((x[0], x[1], x[2]))
-        self.cube.model_mat.rotate(pi / 3, vec3(1.0, 0.5, 1.7))
-        self.cube.model_mat.scale(vec3(0.5))
-#         self.cube.model_mat.rotate(x[5], vec3(cos(x[4])*cos(x[3]), sin(x[4]), cos(x[4])*sin(x[3])))
-
-        self.cube.position = vec3(*x)
+        for i, item in enumerate(self._items):
+            i *= 6
+            item.position = vec3(x[i: i + 3])
+            item.orientation = vec3(x[i+3: i+6])
+#         big_cube = self._items[0]
+#         big_cube.position = vec3(x[0:3])
+#         big_cube.orientation = vec3(x[3:6])
+        
         self.param_lock.release()
         return
     
@@ -331,7 +332,12 @@ class Renderer(Thread):
         self.set_param(x)
     
     def get_param(self):
-        return np.array(self.cube.position)
+#         big_cube = self._items[0]
+        params = []
+        for item in self._items:
+            params.append(item.position)
+            params.append(item.orientation)
+        return np.concatenate(params)
 
     def to_close():
         return False
@@ -358,9 +364,9 @@ class Renderer(Thread):
 def _main():
     renderer = Renderer()
     renderer.start()
-#     gui = MyGUI(renderer)
-#     gui = Weight_Dialog(['a','b','c', 'd','e','f','g'], np.array([0.03, 0.2, 0.2, 0.1, 0.05, 0.4, 0.02]))
-#     gui.run()
+    from shadow_optim import MyGUI
+    gui = MyGUI(renderer)
+    gui.run()
     return
 
 if __name__ == "__main__":
