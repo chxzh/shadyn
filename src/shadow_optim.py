@@ -26,7 +26,8 @@ qt_app = QApplication(sys.argv)
 class MyGUI(QWidget):
     def __init__(self, renderer):
         QWidget.__init__(self)
-        self.renderer = renderer
+        self.renderer = renderer        
+        self.renderer.wait_till_init()
         self._init_window()
         vbox = QVBoxLayout()
         left_boxes = [
@@ -52,7 +53,6 @@ class MyGUI(QWidget):
         self.setLayout(hbox)
         self._optimizer = None
         self.target_path = None
-        self.renderer.wait_till_init()
         self._after_renderer_ready()
         
     def _after_renderer_ready(self):
@@ -286,9 +286,11 @@ class MyGUI(QWidget):
     def _init_set_param(self):
         vbox = QVBoxLayout()
         # attribute := (name, slider_min, slider_max)
-        self.param_attributes = [("cube x-coord", -5, 5), 
-                                 ("cube y-coord", -5, 5), 
-                                 ("cube z-coord", -5, 5)]
+        example_x = self.renderer.get_param()
+#         self.param_attributes = [("cube x-coord", -5, 5), 
+#                                  ("cube y-coord", -5, 5), 
+#                                  ("cube z-coord", -5, 5)]
+        self.param_attributes = [(("param %d"%i),-5,5) for i, x_i in enumerate(example_x)]
         self.param_fields = []
         for index, param_attribute in enumerate(self.param_attributes):
             name, slider_min, slider_max = param_attribute
