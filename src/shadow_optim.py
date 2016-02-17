@@ -718,6 +718,9 @@ class Optimizer(Thread):
     def set_iter_callback(self, callback, *args):
         self._iter_callback = callback
         self._iter_callback_args = args
+        
+    def penalty(self, x):
+        return sum(x**2)
     
     def _record_term(f):
         # decorator that records each term of each evaluation
@@ -744,7 +747,7 @@ class Optimizer(Thread):
         @wraps(f)
         def inner(cls, x):
             res = f(cls, x)
-            return sum([w*y for y, w, n in res])
+            return sum([w*y for y, w, n in res]) + cls.penalty(x)
         return inner
     
     @plotting.plot_sum
