@@ -677,9 +677,9 @@ class Optimizer(Thread):
                    "L-BFGS-B": scipy_optimize_jac,
                    "TNC": scipy_optimize_jac,
                    "COBYLA": scipy_optimize,
-                   "SLSQP": scipy_optimize_jac,
-                   "dogleg": scipy_optimize_jac,
-                   "trust-ncg": scipy_optimize_jac
+                   "SLSQP": scipy_optimize_jac
+#                    ,"dogleg": scipy_optimize_jac, # needs hessian, maybe later
+#                    "trust-ncg": scipy_optimize_jac
                   }
     
     linear_search_list = ['CG', 'BFGS'] # TODO: finish the list
