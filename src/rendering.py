@@ -6,7 +6,7 @@ from ctypes import c_uint8, c_float, c_ushort, c_void_p
 from math import pi, cos, sin
 from cgkit.cgtypes import *
 from PIL import Image
-from threading import Thread, Lock
+from threading import Thread, Lock, Semaphore
 
 class Renderer(Thread):
     @classmethod
@@ -221,8 +221,9 @@ class Renderer(Thread):
         self.look_at = lambda eye, at, up: mat4.lookAt(eye, 2 * eye - at, up).inverse()
 #         self.init()
         self.ss_update = Lock() # ss is short for snapshot
-        self.ss_ready = Lock()
-        self.ss_ready.acquire()
+#         self.ss_ready = Lock()
+#         self.ss_ready.acquire()
+        self.ss_ready = Semaphore(0)
         self.snapshot = None
         self.param_lock = Lock()
         self._init_finished_lock = Lock()
@@ -289,12 +290,13 @@ class Renderer(Thread):
             glDrawElements(GL_TRIANGLES, len(item.model.obj.indices),
                             GL_UNSIGNED_SHORT, None)
         # Swap front and back buffers
-        glfw.swap_buffers(self.window.handle)
         if self.ss_update.locked():
             self._save_snapshot()
             self.ss_ready.release()
+        glfw.swap_buffers(self.window.handle)
         glfw.poll_events()
 
+    # called by external threads
     def acquire_snapshot(self):
         self.ss_update.acquire()
         self.ss_ready.acquire()
@@ -302,10 +304,10 @@ class Renderer(Thread):
         return self.snapshot
         
     def _save_snapshot(self):
-        glfw.swap_buffers(self.window.handle)
+#         glfw.swap_buffers(self.window.handle)
         buff = glReadPixels(self.window.width, 0, self.window.width, 
                          self.window.height, GL_RGB, GL_UNSIGNED_BYTE)
-        glfw.swap_buffers(self.window.handle)
+#         glfw.swap_buffers(self.window.handle)
         im = Image.fromstring(mode="RGB", data=buff, 
                               size=(self.window.width, self.window.height))
         im = im.transpose(Image.FLIP_TOP_BOTTOM)
