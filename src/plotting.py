@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 from functools import wraps
 from IPython.core.magic_arguments import kwds
 from _imaging import path
+import numpy as np
 try:
    import cPickle as pickle
 except:
@@ -48,9 +49,9 @@ class Plotter():
         with open(self._fname+'.xs', 'wb') as handle:
             pickle.dump(self._x_records, handle)
         # plot the things
-        plt.plot(self._eval_sum_records, label="sum")
+        plt.plot(np.log10(self._eval_sum_records), label="sum")
         for term, name in zip(self._eval_term_records, self._term_names):
-            plt.plot(term, label=name)
+            plt.plot(np.log10(term), label=name)
         plt.legend(bbox_to_anchor=(0., 1.05, 1., .102), loc=3,
                ncol=2, borderaxespad=0.)
         plt.title(self._method_name, y=-0.1)
