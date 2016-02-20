@@ -498,7 +498,10 @@ class weight_slider(QWidget):
         return QWidget.mousePressEvent(self, *args, **kwargs)
 
 def cma_optimize(name): # name is unused
-    sigma_0 = 1
+    sigma_0 = 0.5
+    ftarget = 1e-1
+    opts = cma.CMAOptions()
+    opts['ftarget'] = ftarget
     def cma_fmin(f, x):
         res = cma.fmin(objective_function=f, x0=x, sigma0=sigma_0)
         return res[0], res[1]
@@ -537,7 +540,7 @@ def _sq_diff(a, b):
     # calculate the square difference of two equal-shaped numpy array
     return ((a-b)**2).sum()
 
-_X, _Y = 0, 0
+_X, _Y = None, None
 
 def _init_X_Y(width, height):
     # will be called by renderer when the initialization is done
@@ -552,13 +555,15 @@ def _get_sec_moments(image):
     img = img.astype(np.int8)
     width, height = image.size
     img = img.reshape(height, width)
-    M_00 = float(img.sum())        
+    M_00 = float(img.sum())   
+#     if _X == None or _Y == None:
+#         _init_X_Y(width, height)     
     M_10 = (_X * img).sum()
     M_01 = (img * _Y).sum()
     m_10 = M_10 / M_00 if M_00 else 0
     m_01 = M_01 / M_00 if M_00 else 0
-    X_offset = _X-m_10
-    Y_offset = _Y-m_01
+    X_offset = _X - m_10
+    Y_offset = _Y - m_01
     m_20 = ((X_offset**2)*img).sum() / M_00 if M_00 else 0
     m_02 = (img*(Y_offset**2)).sum() / M_00 if M_00 else 0
     m_11 = (X_offset*img*Y_offset).sum() / M_00 if M_00 else 0
@@ -572,6 +577,8 @@ def _get_fst_moments(image):
     width, height = image.size
     img = img.reshape(height, width)
     M_00 = float(img.sum())        
+#     if _X == None or _Y == None:
+#         _init_X_Y(width, height)
     M_10 = (_X * img).sum()
     M_01 = (img * _Y).sum()
     m_10 = M_10 / M_00 if M_00 else 0
@@ -718,9 +725,10 @@ class Optimizer(Thread):
     def set_iter_callback(self, callback, *args):
         self._iter_callback = callback
         self._iter_callback_args = args
-        
+    
+    penalty_weight = 1e-2
     def penalty(self, x):
-        return sum(x**2)
+        return sum(x**2) * self.penalty_weight
     
     def _record_term(f):
         # decorator that records each term of each evaluation
