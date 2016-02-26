@@ -40,7 +40,12 @@ class Renderer(Thread):
             m = mat4(1.0)
             m.translate(self.position)
             rad = self.orientation.length()
-            if rad != 0.0: m.rotate(rad, self.orientation)
+            try:
+                if rad != 0.0: m.rotate(rad, self.orientation)
+            except ZeroDivisionError as e:
+#                 print e.message
+#                 print rad, self.orientation
+                pass
             m.scale(self.scale)
             return m
     
@@ -239,7 +244,7 @@ class Renderer(Thread):
                                                        self.light_pos)
 
         glfw.make_context_current(self.window.handle)
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+#         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
         # draw the scene
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -289,24 +294,35 @@ class Renderer(Thread):
     #         glUniformMatrix4fv(shadow_VP_loc, 1, GL_FALSE, VP_mat_top.toList())
             glDrawElements(GL_TRIANGLES, len(item.model.obj.indices),
                             GL_UNSIGNED_SHORT, None)
+#         if self.ss_update.locked():
+#             self._save_snapshot()
+#             self.ss_ready.release()
+#             self.ss_update.release()
         # Swap front and back buffers
-        if self.ss_update.locked():
-            self._save_snapshot()
-            self.ss_ready.release()
+        self._save_snapshot()
         glfw.swap_buffers(self.window.handle)
         glfw.poll_events()
 
     # called by external threads
     def acquire_snapshot(self):
-        self.ss_update.acquire()
-        self.ss_ready.acquire()
-        self.ss_update.release()
-        return self.snapshot
+        
+#         self.ss_update.acquire()
+#         self.ss_ready.acquire()
+#         self.ss_update.release()
+
+        self.param_lock.acquire()
+        img = self.snapshot.copy()
+        self.param_lock.release()
+        return img
         
     def _save_snapshot(self):
 #         glfw.swap_buffers(self.window.handle)
+        prev_buff_read = glGetIntegerv(GL_READ_BUFFER)
+        glReadBuffer(GL_BACK)
+        glFinish()
         buff = glReadPixels(self.window.width, 0, self.window.width, 
                          self.window.height, GL_RGB, GL_UNSIGNED_BYTE)
+        glReadBuffer(prev_buff_read)
 #         glfw.swap_buffers(self.window.handle)
         im = Image.fromstring(mode="RGB", data=buff, 
                               size=(self.window.width, self.window.height))
@@ -319,7 +335,7 @@ class Renderer(Thread):
         for i, item in enumerate(self._items):
             i *= 6
             item.position = vec3(x[i: i + 3])
-            item.orientation = vec3(x[i+3: i+6])
+            item.orientation = vec3(x[i + 3: i + 6])
 #         big_cube = self._items[0]
 #         big_cube.position = vec3(x[0:3])
 #         big_cube.orientation = vec3(x[3:6])
@@ -358,8 +374,11 @@ class Renderer(Thread):
 #         self.optimize()
         while not glfw.window_should_close(self.window.handle):
             self.param_lock.acquire()
+            glDrawBuffer(GL_BACK)
             self.draw(None)
             self.param_lock.release()
+            err = glGetError()
+            if err != GL_NO_ERROR: print "Encountered a glError:", err
         glfw.terminate()
         pass
 

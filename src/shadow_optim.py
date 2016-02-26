@@ -498,12 +498,12 @@ class weight_slider(QWidget):
         return QWidget.mousePressEvent(self, *args, **kwargs)
 
 def cma_optimize(name): # name is unused
-    sigma_0 = 0.5
-    ftarget = 1e-1
+    sigma_0 = 0.1
+    ftarget = 1e-4
     opts = cma.CMAOptions()
     opts['ftarget'] = ftarget
     def cma_fmin(f, x):
-        res = cma.fmin(objective_function=f, x0=x, sigma0=sigma_0)
+        res = cma.fmin(objective_function=f, x0=x, sigma0=sigma_0, options=opts)
         return res[0], res[1]
     return cma_fmin
 
@@ -581,15 +581,15 @@ def _get_fst_moments(image):
 #         _init_X_Y(width, height)
     M_10 = (_X * img).sum()
     M_01 = (img * _Y).sum()
-    m_10 = M_10 / M_00 if M_00 else 0
-    m_01 = M_01 / M_00 if M_00 else 0
+    m_10 = M_10 / M_00 / 640 if M_00 else 0
+    m_01 = M_01 / M_00 / 480 if M_00 else 0
     return np.array([m_10, m_01])
 
 from PIL import ImageMath as imath    
 def _xor_closure(target):
     def _get_xor(image):
         xor_img = imath.eval("a^b", a=image, b=target)
-        return sum(xor_img.getdata())
+        return sum(xor_img.getdata()) / (640*480)
     return _get_xor
 
 def _sq_diff_closure(func):
@@ -726,9 +726,34 @@ class Optimizer(Thread):
         self._iter_callback = callback
         self._iter_callback_args = args
     
-    penalty_weight = 1e-2
+    penalty_weight = 1e-3
     def penalty(self, x):
         return sum(x**2) * self.penalty_weight
+    
+    def get_mat_model2snapshot(self, img):
+        mat_shaj = self.renderer.shadow.shaject_mat
+        mat_view = self.renderer.cam_cap.view_mat
+        mat_proj = self.renderer.cam_cap.proj_mat
+        w, h = img.size
+        mat_c2s = np.array([[(w-1)/2, 0, 0, (w-1)/2],
+                            [0, (1-h)/2, 0, (h-1)/2],
+                            [0,       0, 0,       0],
+                            [0,       0, 0,       1]])
+        mat_c2s *= np.array(mat_proj * mat_view * mat_shaj).T # cgkit.mat4 is column major
+        return mat_c2s
+    
+    def model_center_penalty_closure(self, img):
+        # presuming the camera for capturing, light and receiver won't move
+        # or otherwise all the mat shall be computed on the fly
+        mat_c2s = self.get_mat_model2snapshot(img)
+        def model_center_penalty(x):
+            positions = self._strip_positions(x)
+            
+            return 0
+        return model_center_penalty
+
+    def _strip_positions(self, x):
+        return [tuple(x[0:3]), tuple(x[6:9]), tuple(x[12:15])]
     
     def _record_term(f):
         # decorator that records each term of each evaluation
