@@ -294,25 +294,25 @@ class Renderer(Thread):
     #         glUniformMatrix4fv(shadow_VP_loc, 1, GL_FALSE, VP_mat_top.toList())
             glDrawElements(GL_TRIANGLES, len(item.model.obj.indices),
                             GL_UNSIGNED_SHORT, None)
-#         if self.ss_update.locked():
-#             self._save_snapshot()
-#             self.ss_ready.release()
+        if self.ss_update.locked():
+            self._save_snapshot()
+            self.ss_ready.release()
 #             self.ss_update.release()
         # Swap front and back buffers
-        self._save_snapshot()
+#         self._save_snapshot()
         glfw.swap_buffers(self.window.handle)
         glfw.poll_events()
 
     # called by external threads
     def acquire_snapshot(self):
         
-#         self.ss_update.acquire()
-#         self.ss_ready.acquire()
-#         self.ss_update.release()
+        self.ss_update.acquire()
+        self.ss_ready.acquire()
+        self.ss_update.release()
 
-        self.param_lock.acquire()
+#         self.param_lock.acquire()
         img = self.snapshot.copy()
-        self.param_lock.release()
+#         self.param_lock.release()
         return img
         
     def _save_snapshot(self):
@@ -326,6 +326,8 @@ class Renderer(Thread):
 #         glfw.swap_buffers(self.window.handle)
         im = Image.fromstring(mode="RGB", data=buff, 
                               size=(self.window.width, self.window.height))
+        if max(max(im.getdata())) == 0:
+            raise RuntimeError("All black encountered")
         im = im.transpose(Image.FLIP_TOP_BOTTOM)
         im = im.convert("L")
         self.snapshot = im
