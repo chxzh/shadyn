@@ -105,12 +105,15 @@ def plot_task(f):
     """Decorator for run() of optimizer, plot and save the things"""
     @wraps(f)
     def inner(cls, *args, **kwds):
-        res = f(cls, *args, **kwds)
-        cls.plotter.set_method(cls._method_name) # TODO: terrible accessing
-        cls.plotter.plot_result()
-        img = cls.renderer.acquire_snapshot()
-        img.save(cls.plotter._path + "\\final_result_snapshot.png") # TODO: ehh
-        return res
+        try:
+            res = f(cls, *args, **kwds)
+            return res
+        finally:
+            cls.plotter.set_method(cls._method_name) # TODO: terrible accessing
+            cls.plotter.plot_result()
+            img = cls.renderer.acquire_snapshot()
+            img.save(cls.plotter._path + "\\final_result_snapshot.png") # TODO: ehh
+
     return inner
 
 @conditional(PLOT_ENABLED)
