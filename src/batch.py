@@ -4,17 +4,7 @@ from shadow_optim import Optimizer
 from rendering import Renderer
 from datetime import datetime as dt
 from itertools import product
-def get_fname(root=None):
-    if not root:
-        root = os.getcwd()
-    elif not os.path.exists(root):
-        os.mkdir(root)
-    time_stamp_str = dt.now().strftime("%m-%d-%H-%M-%S-%y")
-    path = root + '\\' + time_stamp_str
-    if not os.path.exists(path):
-        os.mkdir(path)
-    return path, time_stamp_str
-
+from tools import get_fname
 def get_renderer():
     renderer = Renderer()
     renderer.start()
@@ -58,7 +48,7 @@ def vanilla():
     plotter = plotting.Plotter(*get_fname("..\\res"))
     optimizer = Optimizer(renderer)
     plotting.attach_plotter(optimizer, plotter)
-    optimizer.set_target("C:\\Users\\cxz\\Pictures\\target_mickey.png")
+    optimizer.set_target("..\\img\\target_mickey.png")
     optimizer.set_method("CMA")
     optimizer.set_energy(["first moments (normalized)"], [1])
 #     optimizer.set_energy(["first moments (normalized)", "XOR comparison"], 
