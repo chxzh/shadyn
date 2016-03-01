@@ -52,7 +52,41 @@ class Renderer(Thread):
     class _Model: # a holder of obj, buffers and
         def __init__(self, obj):
             self.obj = obj
-        pass
+            self.flatten = lambda l: [u for t in l for u in t]
+            
+        
+#         @staticmethod
+#         def flatten(l):
+#             return [u for t in l for u in t]
+        
+        def load_to_buffers(self):
+            self.vao_handle = glGenVertexArrays(1)
+            glBindVertexArray(self.vao_handle)
+            self.i_buffer = glGenBuffers(1)
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.i_buffer)
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+                         (c_ushort * len(self.obj.indices))(*self.obj.indices),
+                         GL_STATIC_DRAW)
+            # vertices buffer
+            self.v_buffer = glGenBuffers(1)
+            glBindBuffer(GL_ARRAY_BUFFER, self.v_buffer)
+            v_flatten = self.flatten(self.obj.vertices)
+            glBufferData(GL_ARRAY_BUFFER,
+                         (c_float * len(v_flatten))(*v_flatten),
+                         GL_STATIC_DRAW)
+            # normals buffer
+            self.n_buffer = glGenBuffers(1)
+            glBindBuffer(GL_ARRAY_BUFFER, self.n_buffer)
+            n_flatten = self.flatten(self.obj.normals)
+            glBufferData(GL_ARRAY_BUFFER,
+                         (c_float * len(n_flatten))(*n_flatten),
+                         GL_STATIC_DRAW)
+            
+        def bind_vao(self):
+            glBindVertexArray(self.vao_handle)
+#             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.i_buffer)
+#             glBindBuffer(GL_ARRAY_BUFFER, self.v_buffer)
+#             glBindBuffer(GL_ARRAY_BUFFER, self.n_buffer)
 
     class _Window:  # a windows attribute holder
         pass
@@ -60,8 +94,44 @@ class Renderer(Thread):
     class _Camera:
         pass
     
-    class _Shadow:
-        pass
+    class _Shadow_shader:
+        def __init__(self, vert_path, frag_path):
+            self.handle = tools.load_program(vert_path, frag_path)
+        
+        def bind(self, model):
+            glBindVertexArray(model.vao_handle)
+            self.v_loc = glGetAttribLocation(self.handle, "coord3d")
+            glEnableVertexAttribArray(self.v_loc)
+            glBindBuffer(GL_ARRAY_BUFFER, model.v_buffer)
+            glVertexAttribPointer(self.v_loc, 3, GL_FLOAT, GL_FALSE, 0, None)
+    
+    class _Basic_shader:
+        def __init__(self, vert_path, frag_path):
+            self.handle = tools.load_program(vert_path, frag_path)
+        
+        def bind(self, model):
+            pass
+    
+    class _Shader:
+        # a specific wrapping for standard shading
+        def __init__(self, vert_path, frag_path):
+            self.handle = tools.load_program(vert_path, frag_path)
+            
+        def bind(self, model):
+            glBindVertexArray(model.vao_handle)
+            glUseProgram(self.handle)
+            self.vert_loc = glGetAttribLocation(self.handle,
+                                         "vertexPosition_modelspace")
+            glEnableVertexAttribArray(self.vert_loc)
+            glBindBuffer(GL_ARRAY_BUFFER, model.v_buffer)
+            glVertexAttribPointer(self.vert_loc, 3, GL_FLOAT, GL_FALSE, 0, None)
+            # TODO: fix the existing attribute unable to retrieve problem
+            self.norm_loc = glGetAttribLocation(self.handle,
+                                                     "vertexNormal_modelspace")
+            glEnableVertexAttribArray(self.norm_loc)
+            glBindBuffer(GL_ARRAY_BUFFER, model.n_buffer)
+            glVertexAttribPointer(self.norm_loc, 3, GL_FLOAT, GL_FALSE, 0, None)
+
 
     def init(self):
         # windows initialization
@@ -76,16 +146,18 @@ class Renderer(Thread):
         glClearColor(0.0, 0.0, 0.2, 1.0)
 
         # default blinn-phong shader loading
-        self.program_handle = tools.load_program("../shader/standardShading.v.glsl",
+        self.standard_shader = self._Shader("../shader/standardShading.v.glsl",
                                         "../shader/standardShading.f.glsl")
-        glUseProgram(self.program_handle)
+        self.program_handle = self.standard_shader.handle                                        
+        glUseProgram(self.standard_shader.handle)
 
         self.cube_model = self._Model(Object("../obj/cube.obj"))
+        self.sphere_model = self._Model(Object("../obj/sphere/sphere.obj"))
 #         self.cube.obj = Object("../obj/cube.obj")
         self.cube = self._Item(self.cube_model)
         self.cube.scale = vec3(0.6, 0.6, 0.6)
         self._items.append(self.cube)
-        small_cube = self._Item(self.cube_model)
+        small_cube = self._Item(self.sphere_model)
         small_cube.scale = vec3(0.2,0.2,0.2)
         small_cube.position = vec3(0.7, 0.,0.7)
         self._items.append(small_cube)
@@ -93,44 +165,42 @@ class Renderer(Thread):
         medium_cube.scale = vec3(0.4,0.4,0.4)
         medium_cube.position = vec3(-0.7, 0.,0.7)
         self._items.append(medium_cube)
-        # initialize VAO
-        self.vao_handle = glGenVertexArrays(1)
-        glBindVertexArray(self.vao_handle)
-
+        self.sphere_model.load_to_buffers()
+        self.cube_model.load_to_buffers()
         # bind buffers
         # indices buffer
-        self.cube_model.i_buffer = glGenBuffers(1)
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.cube_model.i_buffer)
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-                     (c_ushort * len(self.cube_model.obj.indices))(*self.cube_model.obj.indices),
-                     GL_STATIC_DRAW)
-        # vertices buffer
-        self.cube_model.v_buffer = glGenBuffers(1)
-        glBindBuffer(GL_ARRAY_BUFFER, self.cube_model.v_buffer)
-        v_flatten = self.flatten(self.cube_model.obj.vertices)
-        glBufferData(GL_ARRAY_BUFFER,
-                     (c_float * len(v_flatten))(*v_flatten),
-                     GL_STATIC_DRAW)
-        # normals buffer
-        self.cube_model.n_buffer = glGenBuffers(1)
-        glBindBuffer(GL_ARRAY_BUFFER, self.cube_model.n_buffer)
-        n_flatten = self.flatten(self.cube_model.obj.normals)
-        glBufferData(GL_ARRAY_BUFFER,
-                     (c_float * len(n_flatten))(*n_flatten),
-                     GL_STATIC_DRAW)
+#         self.cube_model.i_buffer = glGenBuffers(1)
+#         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.cube_model.i_buffer)
+#         glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+#                      (c_ushort * len(self.cube_model.obj.indices))(*self.cube_model.obj.indices),
+#                      GL_STATIC_DRAW)
+#         # vertices buffer
+#         self.cube_model.v_buffer = glGenBuffers(1)
+#         glBindBuffer(GL_ARRAY_BUFFER, self.cube_model.v_buffer)
+#         v_flatten = self.flatten(self.cube_model.obj.vertices)
+#         glBufferData(GL_ARRAY_BUFFER,
+#                      (c_float * len(v_flatten))(*v_flatten),
+#                      GL_STATIC_DRAW)
+#         # normals buffer
+#         self.cube_model.n_buffer = glGenBuffers(1)
+#         glBindBuffer(GL_ARRAY_BUFFER, self.cube_model.n_buffer)
+#         n_flatten = self.flatten(self.cube_model.obj.normals)
+#         glBufferData(GL_ARRAY_BUFFER,
+#                      (c_float * len(n_flatten))(*n_flatten),
+#                      GL_STATIC_DRAW)
 
         # attributes initializing
-        self.cube_model.vert_loc = glGetAttribLocation(self.program_handle,
-                                                 "vertexPosition_modelspace")
-        glEnableVertexAttribArray(self.cube_model.vert_loc)
-        glBindBuffer(GL_ARRAY_BUFFER, self.cube_model.v_buffer)
-        glVertexAttribPointer(self.cube_model.vert_loc, 3, GL_FLOAT, GL_FALSE, 0, None)
-        # TODO: fix the existing attribute unable to retrieve problem
-        self.cube_model.norm_loc = glGetAttribLocation(self.program_handle,
-                                                 "vertexNormal_modelspace")
-        glEnableVertexAttribArray(self.cube_model.norm_loc)
-        glBindBuffer(GL_ARRAY_BUFFER, self.cube_model.n_buffer)
-        glVertexAttribPointer(self.cube_model.norm_loc, 3, GL_FLOAT, GL_FALSE, 0, None)
+#         self.cube_model.vert_loc = glGetAttribLocation(self.program_handle,
+#                                                  "vertexPosition_modelspace")
+#         glEnableVertexAttribArray(self.cube_model.vert_loc)
+#         glBindBuffer(GL_ARRAY_BUFFER, self.cube_model.v_buffer)
+#         glVertexAttribPointer(self.cube_model.vert_loc, 3, GL_FLOAT, GL_FALSE, 0, None)
+#         # TODO: fix the existing attribute unable to retrieve problem
+#         self.cube_model.norm_loc = glGetAttribLocation(self.program_handle,
+#                                                  "vertexNormal_modelspace")
+#         glEnableVertexAttribArray(self.cube_model.norm_loc)
+#         glBindBuffer(GL_ARRAY_BUFFER, self.cube_model.n_buffer)
+#         glVertexAttribPointer(self.cube_model.norm_loc, 3, GL_FLOAT, GL_FALSE, 0, None)
 
         # cube uniforms
 #         self.cube.position = vec3(0.5, 0, 1)
@@ -173,20 +243,16 @@ class Renderer(Thread):
 #         self.floor.MVinv = (self.cam_obs.view_mat * self.floor.model_mat).inverse()
 
         # initialize shadow projection program
-        self.shadow_program_handle = tools.load_program("../shader/shadowProjectionShading.v.glsl",
-                                                   "../shader/shadowProjectionShading.f.glsl")
+        self.shadow = self._Shadow_shader("../shader/shadowProjectionShading.v.glsl",
+                                    "../shader/shadowProjectionShading.f.glsl")
+        self.shadow_program_handle = self.shadow.handle
         glUseProgram(self.shadow_program_handle)
-        self.shadow = self._Shadow()
         self.shadow.MsVP_loc = glGetUniformLocation(self.shadow_program_handle, "MsVP")
         self.shadow.VP_mat = self.cam_obs.proj_mat * self.cam_obs.view_mat;
         self.shadow.VP_mat_top = self.cam_cap.proj_mat * self.cam_cap.view_mat;
         self.shadow.shaject_mat = self.shadow_proj_mat(vec3(0, 1, 0), vec3(0, -0.45, 0), self.light_pos)
         glUniform3f(glGetUniformLocation(self.shadow_program_handle, "shadowColor"),
                      0.0, 0.0, 0.0)  # black shadow
-        self.shadow.v_loc = glGetAttribLocation(self.shadow_program_handle, "coord3d")
-        glEnableVertexAttribArray(self.shadow.v_loc)
-        glBindBuffer(GL_ARRAY_BUFFER, self.cube_model.v_buffer)
-        glVertexAttribPointer(self.shadow.v_loc, 3, GL_FLOAT, GL_FALSE, 0, None)
 
         # init the shader to draw the basic shadow
         self.basic_program_handle = tools.load_program("../shader/basic.v.glsl",
@@ -253,6 +319,7 @@ class Renderer(Thread):
         glUseProgram(self.program_handle)
         glUniform3f(self.light_pos_loc, *self.light_pos)
         for item in self._items:
+            self.standard_shader.bind(item.model)
             model_view_inv = (self.cam_obs.view_mat * item.model_mat()).inverse()
             glUniformMatrix4fv(self.MVint_loc, 1, GL_TRUE, model_view_inv.toList())
             glUniformMatrix4fv(self.M_loc, 1, GL_FALSE, item.model_mat().toList())
@@ -272,6 +339,7 @@ class Renderer(Thread):
         # draw the projected shadows
         glUseProgram(self.shadow_program_handle)
         for item in self._items:
+            self.shadow.bind(item.model)
             glUniformMatrix4fv(self.shadow.MsVP_loc, 1, GL_FALSE,
                    (self.shadow.VP_mat * self.shadow.shaject_mat * item.model_mat()).toList())
             glDrawElements(GL_TRIANGLES, len(item.model.obj.indices),
@@ -287,6 +355,7 @@ class Renderer(Thread):
         
         glUseProgram(self.shadow_program_handle)
         for item in self._items:
+            self.shadow.bind(item.model)
             glUniformMatrix4fv(self.shadow.MsVP_loc, 1, GL_FALSE,
                    (self.shadow.VP_mat_top * self.shadow.shaject_mat * item.model_mat()).toList())
     
@@ -387,9 +456,9 @@ class Renderer(Thread):
 def _main():
     renderer = Renderer()
     renderer.start()
-    from shadow_optim import MyGUI
-    gui = MyGUI(renderer)
-    gui.run()
+#     from shadow_optim import MyGUI
+#     gui = MyGUI(renderer)
+#     gui.run()
     return
 
 if __name__ == "__main__":
