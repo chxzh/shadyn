@@ -3,6 +3,7 @@ from functools import wraps
 from IPython.core.magic_arguments import kwds
 from _imaging import path
 import numpy as np
+import os
 try:
    import cPickle as pickle
 except:
@@ -41,6 +42,8 @@ class Plotter():
         self._x_records.append(x)
     
     def plot_result(self):
+        if not os.path.exists(_path):
+            os.mkdir(_path)
         # pickle the result for later availability
         with open(self._fname+'.terms', 'wb') as handle:
             pickle.dump(self._eval_term_records, handle)
@@ -109,6 +112,7 @@ def plot_task(f):
             res = f(cls, *args, **kwds)
             return res
         finally:
+            
             cls.plotter.set_method(cls._method_name) # TODO: terrible accessing
             cls.plotter.plot_result()
             img = cls.renderer.acquire_snapshot()

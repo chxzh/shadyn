@@ -1,5 +1,7 @@
 from OpenGL.GL import *
 import glfw
+import os
+from datetime import datetime as dt
 def load_obj(filepath):
     pass
 
@@ -29,6 +31,16 @@ def load_program(vert_shader_path, frag_shader_path):
         glDetachShader(program_handle, shader_handle)
         glDeleteShader(shader_handle)
     return program_handle
+
+
+def get_fname(root=None):
+    if not root:
+        root = os.getcwd()
+    elif not os.path.exists(root):
+        os.mkdir(root)
+    time_stamp_str = dt.now().strftime("%m-%d-%H-%M-%S-%y")
+    path = root + '\\' + time_stamp_str
+    return path, time_stamp_str
 
 def _main():
     pass
