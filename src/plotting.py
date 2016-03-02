@@ -42,8 +42,8 @@ class Plotter():
         self._x_records.append(x)
     
     def plot_result(self):
-        if not os.path.exists(_path):
-            os.mkdir(_path)
+        if not os.path.exists(self._path):
+            os.mkdir(self._path)
         # pickle the result for later availability
         with open(self._fname+'.terms', 'wb') as handle:
             pickle.dump(self._eval_term_records, handle)
