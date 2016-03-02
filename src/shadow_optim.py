@@ -20,6 +20,7 @@ import random
 from astropy.convolution.boundary_extend import DTYPE
 import log, plotting
 from functools import wraps
+from tools import get_fname
 # log.init()
 
 qt_app = QApplication(sys.argv)
@@ -28,6 +29,7 @@ class MyGUI(QWidget):
         QWidget.__init__(self)
         self.renderer = renderer        
         self.renderer.wait_till_init()
+        _init_X_Y(renderer.window.width, renderer.window.height)
         self._init_window()
         vbox = QVBoxLayout()
         left_boxes = [
@@ -116,6 +118,8 @@ class MyGUI(QWidget):
         # not started
         if self._optimizer == None or not self._optimizer.is_alive():
             self._optimizer = Optimizer(self.renderer)
+            plotter = plotting.Plotter(*get_fname("..\\res"))
+            plotting.attach_plotter(self._optimizer, plotter)
             # configuring the optimizer by feeding in optimizing-method and energy function
             if self.target_path != None:
                 self._optimizer.set_target(self.target_path)
@@ -497,6 +501,7 @@ class weight_slider(QWidget):
         print "mouse pressed"
         return QWidget.mousePressEvent(self, *args, **kwargs)
 
+# obsolete, check out the one as an instance method of Optimizer
 def cma_optimize(name): # name is unused
     sigma_0 = 0.1
     ftarget = 1e-4
@@ -695,8 +700,38 @@ class Optimizer(Thread):
     
     def set_method(self, name):
         # this is the interface for manager
-        self._optim_method = Optimizer.method_dic[name](name)
+        if name == "CMA":
+            self._optim_method = self._explict_CMA
+        else:
+            self._optim_method = Optimizer.method_dic[name](name)
         self._method_name = name
+    
+    def _explict_CMA(self, f, x):
+        # it is very inappropriate to call them solutions as they are guesses
+        # I'd rather call it samples or guesses but I yield
+        def generate(solutions):
+            for x in solutions:
+                try:
+                    yield f(x)
+                except:
+                    # like encountering an all-black error
+                    self.renderer.stop()
+                    self.renderer = Renderer()
+                    self.renderer.start()
+                    self.renderer.wait_till_init()
+                    yield f(x)
+        
+        sigma_0 = 0.1
+        ftarget = 2e-4
+        opts = cma.CMAOptions()
+        opts['ftarget'] = ftarget
+        es = cma.CMAEvolutionStrategy(x, sigma_0, opts)
+        while not es.stop():
+            solutions = es.ask()
+            fvals = [y for y in generate(solutions)]
+            es.tell(solutions, fvals)
+        res = es.result()
+        return res[0], res[1]
     
     @plotting.init_plot
     def set_energy(self, func_names, weights):
@@ -735,6 +770,7 @@ class Optimizer(Thread):
         mat_view = self.renderer.cam_cap.view_mat
         mat_proj = self.renderer.cam_cap.proj_mat
         w, h = img.size
+        # mat_c2s is projection from clip coordinate to image coordinate
         mat_c2s = np.array([[(w-1)/2, 0, 0, (w-1)/2],
                             [0, (1-h)/2, 0, (h-1)/2],
                             [0,       0, 0,       0],
