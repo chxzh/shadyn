@@ -300,6 +300,10 @@ class Renderer(Thread):
         self._init_finished_lock = Lock()
         self._init_finished_lock.acquire()
         self._items = []
+        self._cont_flag = True
+    
+    def stop(self):
+        self._cont_flag = False
 
     def draw(self, x):
 #         self.set_param(x)
@@ -443,7 +447,7 @@ class Renderer(Thread):
         self.init()
         self._init_finished_lock.release()
 #         self.optimize()
-        while not glfw.window_should_close(self.window.handle):
+        while not glfw.window_should_close(self.window.handle) and self._cont_flag:
             self.param_lock.acquire()
             glDrawBuffer(GL_BACK)
             self.draw(None)
