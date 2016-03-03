@@ -11,6 +11,7 @@ import numpy as np
 import atb
 from datetime import datetime as dt
 from cgkit.fob import POSITION
+from random import random, randint
 
 class Renderer(Thread):
     @classmethod
@@ -38,6 +39,16 @@ class Renderer(Thread):
             self.position = vec3(0,0,0)
             self.orientation = vec3(0,0,0)
             self.scale = vec3(1,1,1)
+            self.color = self.get_light_color()
+        
+        @staticmethod
+        def get_light_color():
+            color = vec3(random(), 1, 0)
+            i = randint(0, 2)
+            color[0], color[i] = color[i], color[0]
+            i = randint(0, 1)
+            color[0], color[i] = color[i], color[0]
+            return color
         
         def model_mat(self):
             # M = "SRT" = T * R * S
@@ -141,7 +152,7 @@ class Renderer(Thread):
         # windows initialization
         self.window = self._Window()
         self.window.width, self.window.height = (640, 480)
-        self.window.handle = glfw.create_window(self.window.width * 2, self.window.height, "scene", None, None)
+        self.window.handle = glfw.create_window(self.window.width * 5 / 2, self.window.height, "scene", None, None)
         if self.window.handle == None:
             glfw.terminate()
             raise RuntimeError("GLFW cannot create a window.")
@@ -167,7 +178,8 @@ class Renderer(Thread):
         self._items.append(small_cube)
         medium_cube = self._Item(self.cube_model)
         medium_cube.scale = vec3(0.4,0.4,0.4)
-        medium_cube.position = vec3(-0.7, 0.,0.7)
+        medium_cube.position = vec3(0.2, 0.5,0.7)
+#         medium_cube.position = vec3(-0.7, 0.,0.7)
         self._items.append(medium_cube)
         self.sphere_model.load_to_buffers()
         self.cube_model.load_to_buffers()
@@ -237,6 +249,7 @@ class Renderer(Thread):
 #         self.cube.MVP = mat4(1)
         self.M_loc = glGetUniformLocation(self.program_handle, "M")
         self.MVint_loc = glGetUniformLocation(self.program_handle, "MVint")
+        self.color_loc = glGetUniformLocation(self.standard_shader.handle, "MaterialDiffuseColor")
 
         # init the floor
         self.floor = self._Item(self.cube_model)
@@ -379,8 +392,10 @@ class Renderer(Thread):
             model_view_inv = (self.cam_obs.view_mat * item.model_mat()).inverse()
             glUniformMatrix4fv(self.MVint_loc, 1, GL_TRUE, model_view_inv.toList())
             glUniformMatrix4fv(self.M_loc, 1, GL_FALSE, item.model_mat().toList())
+            
             MVP = self.cam_obs.proj_mat * self.cam_obs.view_mat * item.model_mat()
             glUniformMatrix4fv(self.MVP_loc, 1, GL_FALSE, MVP.toList())
+            glUniform3f(self.color_loc, *item.color)
             glDrawElements(GL_TRIANGLES, len(item.model.obj.indices),
                             GL_UNSIGNED_SHORT, None);
         MVint = (self.cam_obs.view_mat * self.floor.model_mat()).inverse()
@@ -389,11 +404,14 @@ class Renderer(Thread):
         glUniformMatrix4fv(self.M_loc, 1, GL_FALSE, M.toList())
         MVP = self.cam_obs.proj_mat * self.cam_obs.view_mat * M
         glUniformMatrix4fv(self.MVP_loc, 1, GL_FALSE, MVP.toList())
+        glUniform3f(self.color_loc, 1., 1., 1.)
         glDrawElements(GL_TRIANGLES, len(self.floor.model.obj.indices),
                         GL_UNSIGNED_SHORT, None)
         glDisable(GL_CULL_FACE)
         # draw the projected shadows
         glUseProgram(self.shadow_program_handle)
+        glUniform3f(glGetUniformLocation(self.shadow_program_handle, "shadowColor"),
+             0.0, 0.0, 0.0)  # black shadow
         for item in self._items:
             self.shadow.bind(item.model)
             glUniformMatrix4fv(self.shadow.MsVP_loc, 1, GL_FALSE,
@@ -403,13 +421,14 @@ class Renderer(Thread):
 
 
         glViewport(self.window.width, 0, self.window.width, self.window.height)
-
         glDisable(GL_CULL_FACE)
         glUseProgram(self.basic_program_handle)
         glDrawElements(GL_TRIANGLES, len(self.floor.model.obj.indices),
                         GL_UNSIGNED_SHORT, None)
-        
         glUseProgram(self.shadow_program_handle)
+        glEnable(GL_CULL_FACE)
+        glUniform3f(glGetUniformLocation(self.shadow.handle, "shadowColor"),
+                    0.0, 0.0, 0.0)  # black shadow
         for item in self._items:
             self.shadow.bind(item.model)
             glUniformMatrix4fv(self.shadow.MsVP_loc, 1, GL_FALSE,
@@ -419,12 +438,34 @@ class Renderer(Thread):
     #         glUniformMatrix4fv(shadow_VP_loc, 1, GL_FALSE, VP_mat_top.toList())
             glDrawElements(GL_TRIANGLES, len(item.model.obj.indices),
                             GL_UNSIGNED_SHORT, None)
+        
+        glViewport(self.window.width*2, 0, self.window.width/2, self.window.height/2)
+        glDisable(GL_CULL_FACE)
+        glUseProgram(self.basic_program_handle)
+        glDrawElements(GL_TRIANGLES, len(self.floor.model.obj.indices),
+                        GL_UNSIGNED_SHORT, None)
+        glUseProgram(self.shadow_program_handle)
+        glEnable(GL_CULL_FACE)
+        for item in self._items:
+            self.shadow.bind(item.model)
+            glUniformMatrix4fv(self.shadow.MsVP_loc, 1, GL_FALSE,
+                   (self.shadow.VP_mat_top * self.shadow.shaject_mat * item.model_mat()).toList())
+            glUniform3f(glGetUniformLocation(self.shadow.handle, "shadowColor"),
+                        *item.color)  # black shadow
+    #         glUniformMatrix4fv(shadow_M_loc, 1, GL_FALSE, model_mat.toList())
+    #         glUniformMatrix4fv(shadow_VP_loc, 1, GL_FALSE, VP_mat_top.toList())
+            glDrawElements(GL_TRIANGLES, len(item.model.obj.indices),
+                            GL_UNSIGNED_SHORT, None)
+            
+            
+        # handling snapshot request if any
         if self.ss_update.locked():
             self._save_snapshot()
             self.ss_ready.release()
 #             self.ss_update.release()
         # Swap front and back buffers
 #         self._save_snapshot()
+
 
         atb.TwDraw()
         glfw.swap_buffers(self.window.handle)
