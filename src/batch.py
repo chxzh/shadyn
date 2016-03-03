@@ -50,9 +50,9 @@ def vanilla():
     plotting.attach_plotter(optimizer, plotter)
     optimizer.set_target("..\\img\\target_mickey.png")
     optimizer.set_method("CMA")
-    optimizer.set_energy(["first moments (normalized)"], [1])
-#     optimizer.set_energy(["first moments (normalized)", "XOR comparison"], 
-#                          [1,  1])
+#     optimizer.set_energy(["first moments (normalized)"], [1])
+    optimizer.set_energy(["first moments (normalized)", "XOR comparison"], 
+                         [1,  1])
 #     optimizer.set_energy(["XOR comparison"], [1])
     optimizer.run()
     

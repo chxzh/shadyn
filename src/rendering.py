@@ -7,6 +7,10 @@ from math import pi, cos, sin
 from cgkit.cgtypes import *
 from PIL import Image
 from threading import Thread, Lock, Semaphore
+import numpy as np
+import atb
+from datetime import datetime as dt
+from cgkit.fob import POSITION
 
 class Renderer(Thread):
     @classmethod
@@ -275,6 +279,53 @@ class Renderer(Thread):
 
 #         self._X = np.arange(self.window.width).reshape(1,self.window.width)
 #         self._Y = np.arange(self.window.height).reshape(self.window.height,1)
+        self.init_atb()
+    
+    def init_atb(self):
+#         atb.init() # cannot tell what for, given by the binding author
+        self.total = -233.3
+        atb.TwInit(atb.TW_OPENGL, None)
+        atb.TwWindowSize(self.window.width, self.window.height)
+        self.extern_param_bar = atb.Bar(name="extern_param", label="evals", help="Scene atb",
+                           position=(10, 10), size=(200,30))
+        self.extern_param_bar.add_var("total", getter=self.get_total, precision=6)
+        atb.TwDefine("extern_param refresh=0.1")
+        pass
+    
+    def get_total(self):
+        return self.total
+    
+    def set_total(self, total):
+        self.total = total
+    
+    def _disp_getter_closure(self, name):
+        dict = {} # needs initialize somehow somewhere else
+        def getter():
+            return dic[name]
+        return getter
+
+    def get_mat_model2snapshot(self):
+        mat_shaj = self.shadow.shaject_mat
+        mat_view = self.cam_cap.view_mat
+        mat_proj = self.cam_cap.proj_mat
+        w, h = self.window.width, self.window.height
+        # mat_c2s is projection from clip coordinate to image coordinate
+        mat_c2s = np.array([[(w-1)/2, 0, 0, (w-1)/2],
+                            [0, (1-h)/2, 0, (h-1)/2],
+                            [0,       0, 0,       0],
+                            [0,       0, 0,       1]])
+        mat_c2s *= np.array(mat_proj * mat_view * mat_shaj).T # cgkit.mat4 is column major
+        return mat_c2s
+    
+    def model_center_penalty_closure(self, img):
+        # presuming the camera for capturing, light and receiver won't move
+        # or otherwise all the mat shall be computed on the fly
+        mat_c2s = self.get_mat_model2snapshot(img)
+        def model_center_penalty(x):
+            positions = self._strip_positions(x)
+            
+            return 0
+        return model_center_penalty
     
     # obsolete
     def set_target_image(self, filepath):
@@ -306,6 +357,7 @@ class Renderer(Thread):
         self._cont_flag = False
 
     def draw(self, x):
+        
 #         self.set_param(x)
         # Render here
         # Make the window's context current
@@ -373,6 +425,8 @@ class Renderer(Thread):
 #             self.ss_update.release()
         # Swap front and back buffers
 #         self._save_snapshot()
+
+        atb.TwDraw()
         glfw.swap_buffers(self.window.handle)
         glfw.poll_events()
 
@@ -385,7 +439,9 @@ class Renderer(Thread):
 
 #         self.param_lock.acquire()
         img = self.snapshot.copy()
-#         self.param_lock.release()
+        if max(img.getdata()) == 0:
+            raise RuntimeError("All black encountered")
+        img = img.transpose(Image.FLIP_TOP_BOTTOM)
         return img
         
     def _save_snapshot(self):
@@ -397,13 +453,11 @@ class Renderer(Thread):
                          self.window.height, GL_RGB, GL_UNSIGNED_BYTE)
         glReadBuffer(prev_buff_read)
 #         glfw.swap_buffers(self.window.handle)
-        im = Image.fromstring(mode="RGB", data=buff, 
+        img = Image.fromstring(mode="RGB", data=buff, 
                               size=(self.window.width, self.window.height))
-        if max(max(im.getdata())) == 0:
-            raise RuntimeError("All black encountered")
-        im = im.transpose(Image.FLIP_TOP_BOTTOM)
-        im = im.convert("L")
-        self.snapshot = im
+        img = img.convert("L")
+#         self.param_lock.release()
+        self.snapshot = img
     
     def set_param(self, x):
         self.param_lock.acquire()

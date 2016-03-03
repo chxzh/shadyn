@@ -722,7 +722,7 @@ class Optimizer(Thread):
                     yield f(x)
         
         sigma_0 = 0.1
-        ftarget = 2e-4
+        ftarget = 1.5e-4
         opts = cma.CMAOptions()
         opts['ftarget'] = ftarget
         es = cma.CMAEvolutionStrategy(x, sigma_0, opts)
@@ -791,6 +791,7 @@ class Optimizer(Thread):
     def _strip_positions(self, x):
         return [tuple(x[0:3]), tuple(x[6:9]), tuple(x[12:15])]
     
+    # obsolete
     def _record_term(f):
         # decorator that records each term of each evaluation
         @wraps(f)
@@ -802,6 +803,7 @@ class Optimizer(Thread):
             return res
         return inner
     
+    # obsolete
     def _record_sum(f):
         # decorator that records sum of all terms of each evaluation
         @wraps(f)
@@ -816,7 +818,9 @@ class Optimizer(Thread):
         @wraps(f)
         def inner(cls, x):
             res = f(cls, x)
-            return sum([w*y for y, w, n in res]) + cls.penalty(x)
+            total = sum([w*y for y, w, n in res]) + cls.penalty(x)
+            cls.renderer.set_total(total)
+            return total
         return inner
     
     @plotting.plot_sum
