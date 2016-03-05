@@ -2,6 +2,7 @@ from OpenGL.GL import *
 import glfw
 import os
 from datetime import datetime as dt
+from astropy.units import bar
 def load_obj(filepath):
     pass
 
@@ -41,6 +42,41 @@ def get_fname(root=None):
     time_stamp_str = dt.now().strftime("%m-%d-%H-%M-%S-%y")
     path = root + '\\' + time_stamp_str
     return path, time_stamp_str
+
+def ring_bisector_generator_closure(upper=360):
+    # upper is not included, i.e. [0, upper)
+    def hue_generator():
+        yield 0
+        i = 1
+        bar = 2
+        while True:
+            hue = upper * ((i - bar / 2) * 2 + 1) / bar
+            i += 1
+            if i >= bar: bar *= 2
+            yield hue
+    return hue_generator
+
+hue_generator = ring_bisector_generator_closure(360)
+
+from random import randint
+def random_bright_color_generator():
+    upper = 6*64
+    hue_gen = ring_bisector_generator_closure(upper)()
+#     offset = 0
+    offset = randint(0, upper - 1)
+    while True:
+        hue = hue_gen.next() + offset
+        hue = hue % upper
+        color = [0., 0., 0.]
+        i = hue * 3 / upper
+        color[i] = 1.
+        diff = hue - upper / 6 * (2*i+1)
+        if diff < 0: j = -1
+        else: j = 1
+        j = (j + i) % 3
+        color[j] = float(abs(diff)) * 6/ upper
+        yield color  
+        print hue, '/', upper, color
 
 def _main():
     pass

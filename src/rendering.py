@@ -34,12 +34,13 @@ class Renderer(Thread):
         return mat4(shad_mat.astype(np.float32).T.tolist())
 
     class _Item:  # a temporary holder of attributes and uniforms
+        color_gen = tools.random_bright_color_generator()
         def __init__(self, model):
             self.model = model
             self.position = vec3(0,0,0)
             self.orientation = vec3(0,0,0)
             self.scale = vec3(1,1,1)
-            self.color = self.get_light_color()
+            self.color = vec3(self.color_gen.next())
         
         @staticmethod
         def get_light_color():
@@ -268,8 +269,9 @@ class Renderer(Thread):
         self.shadow.VP_mat = self.cam_obs.proj_mat * self.cam_obs.view_mat;
         self.shadow.VP_mat_top = self.cam_cap.proj_mat * self.cam_cap.view_mat;
         self.shadow.shaject_mat = self.shadow_proj_mat(vec3(0, 1, 0), vec3(0, -0.45, 0), self.light_pos)
-        glUniform3f(glGetUniformLocation(self.shadow_program_handle, "shadowColor"),
-                     0.0, 0.0, 0.0)  # black shadow
+        self.shadow.color_loc = glGetUniformLocation(self.shadow.handle, "shadowColor")
+        glUniform3f(self.shadow.color_loc, 0.0, 0.0, 0.0)  # black shadow
+        self.shadow.alpha_loc = glGetUniformLocation(self.shadow.handle, "alpha")
 
         # init the shader to draw the basic shadow
         self.basic_program_handle = tools.load_program("../shader/basic.v.glsl",
@@ -287,6 +289,7 @@ class Renderer(Thread):
         glEnable(GL_DEPTH_TEST)
         glDepthFunc(GL_LESS)
         glEnable(GL_CULL_FACE)
+
         
 #         _init_X_Y(self.window.width, self.window.height)
 
@@ -302,6 +305,7 @@ class Renderer(Thread):
         self.extern_param_bar = atb.Bar(name="extern_param", label="evals", help="Scene atb",
                            position=(10, 10), size=(200,30))
         self.extern_param_bar.add_var("total", getter=self.get_total, precision=6)
+        self.extern_param_bar.add_separator("separator")
         atb.TwDefine("extern_param refresh=0.1")
         pass
     
@@ -410,8 +414,8 @@ class Renderer(Thread):
         glDisable(GL_CULL_FACE)
         # draw the projected shadows
         glUseProgram(self.shadow_program_handle)
-        glUniform3f(glGetUniformLocation(self.shadow_program_handle, "shadowColor"),
-             0.0, 0.0, 0.0)  # black shadow
+        glUniform3f(self.shadow.color_loc, 0.0, 0.0, 0.0)  # black shadow
+#         glUniform1f(self.shadow.alpha_loc, 0.5)
         for item in self._items:
             self.shadow.bind(item.model)
             glUniformMatrix4fv(self.shadow.MsVP_loc, 1, GL_FALSE,
@@ -446,17 +450,24 @@ class Renderer(Thread):
                         GL_UNSIGNED_SHORT, None)
         glUseProgram(self.shadow_program_handle)
         glEnable(GL_CULL_FACE)
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glLineWidth(2)
         for item in self._items:
             self.shadow.bind(item.model)
             glUniformMatrix4fv(self.shadow.MsVP_loc, 1, GL_FALSE,
                    (self.shadow.VP_mat_top * self.shadow.shaject_mat * item.model_mat()).toList())
+#             glUniform3f(glGetUniformLocation(self.shadow.handle, "shadowColor"),
+#                         0., 0., 0.)
+#             glDrawElements(GL_LINE_LOOP, len(item.model.obj.indices),
+#                             GL_UNSIGNED_SHORT, None)
             glUniform3f(glGetUniformLocation(self.shadow.handle, "shadowColor"),
-                        *item.color)  # black shadow
+                        *item.color)
     #         glUniformMatrix4fv(shadow_M_loc, 1, GL_FALSE, model_mat.toList())
     #         glUniformMatrix4fv(shadow_VP_loc, 1, GL_FALSE, VP_mat_top.toList())
             glDrawElements(GL_TRIANGLES, len(item.model.obj.indices),
                             GL_UNSIGNED_SHORT, None)
-            
+        glDisable(GL_BLEND)
             
         # handling snapshot request if any
         if self.ss_update.locked():
