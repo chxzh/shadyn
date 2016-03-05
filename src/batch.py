@@ -41,6 +41,7 @@ def all_single_energy_combos():
     
 def vanilla():
     renderer = Renderer()
+    renderer.set_energy_terms(Optimizer.energy_dic.keys())
     renderer.start()
     renderer.wait_till_init()
     import shadow_optim

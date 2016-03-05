@@ -76,7 +76,6 @@ def random_bright_color_generator():
         j = (j + i) % 3
         color[j] = float(abs(diff)) * 6/ upper
         yield color  
-        print hue, '/', upper, color
 
 def _main():
     pass

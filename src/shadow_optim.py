@@ -607,11 +607,14 @@ def _sq_diff_closure(func):
     
 
 class Optimizer(Thread):
-    def __init__(self, renderer):
+    def __init__(self, renderer=None):
         Thread.__init__(self)
         # only when green light is unlocked will the optimization continue
         self.green_light = Lock()
-        self.renderer = renderer
+        if renderer:
+            self.renderer = renderer
+        else:
+            self.renderer = Renderer()
         self._optim_method = lambda *x: None
         self._energy_list = []
         self.set_param = renderer.set_param
@@ -627,6 +630,13 @@ class Optimizer(Thread):
         self._eval_term_records = ()
         self._eval_sum_record = None
         self.result = None
+    
+    def _init_renderer(self, renderer=None):
+        # if renderer != None, it is starting a new one
+        if renderer != None: self.renderer = renderer
+        self.renderer.set_energy_terms(self.energy_dic.keys())
+        if renderer != None: self.renderer.start()
+        self.renderer.wait_till_init()
     
     @log.task_log
     @plotting.plot_task
@@ -647,6 +657,7 @@ class Optimizer(Thread):
         else:
             pass
         # wrap optimizer with green_light
+        self._init_renderer()
         self.result = self._optim_method(x=self.renderer.get_param(),
                            f=err_func)
         self._finished_callback(*self._finished_callback_args)
@@ -716,8 +727,7 @@ class Optimizer(Thread):
                 except:
                     # like encountering an all-black error
                     self.renderer.stop()
-                    self.renderer = Renderer()
-                    self.renderer.start()
+                    self._init_renderer(Renderer())
                     self.renderer.wait_till_init()
                     yield f(x)
         

@@ -148,6 +148,11 @@ class Renderer(Thread):
             glBindBuffer(GL_ARRAY_BUFFER, model.n_buffer)
             glVertexAttribPointer(self.norm_loc, 3, GL_FLOAT, GL_FALSE, 0, None)
 
+    def set_energy_terms(self, names):
+        for name in names:
+            if not self._energy_terms.has_key(name):
+                self._energy_terms[name] = -23.3
+        pass
 
     def init(self):
         # windows initialization
@@ -303,9 +308,11 @@ class Renderer(Thread):
         atb.TwInit(atb.TW_OPENGL, None)
         atb.TwWindowSize(self.window.width, self.window.height)
         self.extern_param_bar = atb.Bar(name="extern_param", label="evals", help="Scene atb",
-                           position=(10, 10), size=(200,30))
+                           position=(10, 10), size=(200,300))
         self.extern_param_bar.add_var("total", getter=self.get_total, precision=6)
         self.extern_param_bar.add_separator("separator")
+        for name in self._energy_terms:
+            self.extern_param_bar.add_var(name, getter=self._disp_getter_closure(name))
         atb.TwDefine("extern_param refresh=0.1")
         pass
     
@@ -316,9 +323,9 @@ class Renderer(Thread):
         self.total = total
     
     def _disp_getter_closure(self, name):
-        dict = {} # needs initialize somehow somewhere else
+        dict = self._energy_terms # needs initialize somehow somewhere else
         def getter():
-            return dic[name]
+            return dict[name]
         return getter
 
     def get_mat_model2snapshot(self):
@@ -369,6 +376,7 @@ class Renderer(Thread):
         self._init_finished_lock.acquire()
         self._items = []
         self._cont_flag = True
+        self._energy_terms = {}
     
     def stop(self):
         self._cont_flag = False
