@@ -156,9 +156,10 @@ class Renderer(Thread):
 
     def init(self):
         # windows initialization
-        self.window = self._Window()
-        self.window.width, self.window.height = (640, 480)
-        self.window.handle = glfw.create_window(self.window.width * 5 / 2, self.window.height, "scene", None, None)
+        self.window = self._Window()        
+        self.viewport_size = w, h = (640, 480)
+        self.window.width, self.window.height = (w*5/2, h)
+        self.window.handle = glfw.create_window(self.window.width, self.window.height, "scene", None, None)
         if self.window.handle == None:
             glfw.terminate()
             raise RuntimeError("GLFW cannot create a window.")
@@ -306,7 +307,7 @@ class Renderer(Thread):
 #         atb.init() # cannot tell what for, given by the binding author
         self.total = -233.3
         atb.TwInit(atb.TW_OPENGL, None)
-        atb.TwWindowSize(self.window.width, self.window.height)
+        atb.TwWindowSize(*self.viewport_size)
         self.extern_param_bar = atb.Bar(name="extern_param", label="evals", help="Scene atb",
                            position=(10, 10), size=(200,300))
         self.extern_param_bar.add_var("total", getter=self.get_total, precision=6)
@@ -332,7 +333,7 @@ class Renderer(Thread):
         mat_shaj = self.shadow.shaject_mat
         mat_view = self.cam_cap.view_mat
         mat_proj = self.cam_cap.proj_mat
-        w, h = self.window.width, self.window.height
+        w, h = self.viewport_size
         # mat_c2s is projection from clip coordinate to image coordinate
         mat_c2s = np.array([[(w-1)/2, 0, 0, (w-1)/2],
                             [0, (1-h)/2, 0, (h-1)/2],
@@ -392,11 +393,11 @@ class Renderer(Thread):
 
         glfw.make_context_current(self.window.handle)
 #         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-
+        w, h = self.viewport_size
         # draw the scene
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glEnable(GL_CULL_FACE)
-        glViewport(0, 0, self.window.width, self.window.height)
+        glViewport(0, 0, w, h)
         glUseProgram(self.program_handle)
         glUniform3f(self.light_pos_loc, *self.light_pos)
         for item in self._items:
@@ -431,8 +432,8 @@ class Renderer(Thread):
             glDrawElements(GL_TRIANGLES, len(item.model.obj.indices),
                             GL_UNSIGNED_SHORT, None)
 
-
-        glViewport(self.window.width, 0, self.window.width, self.window.height)
+        
+        glViewport(w, 0, w, h)
         glDisable(GL_CULL_FACE)
         glUseProgram(self.basic_program_handle)
         glDrawElements(GL_TRIANGLES, len(self.floor.model.obj.indices),
@@ -451,7 +452,7 @@ class Renderer(Thread):
             glDrawElements(GL_TRIANGLES, len(item.model.obj.indices),
                             GL_UNSIGNED_SHORT, None)
         
-        glViewport(self.window.width*2, 0, self.window.width/2, self.window.height/2)
+        glViewport(w*2, 0, w/2, h/2)
         glDisable(GL_CULL_FACE)
         glUseProgram(self.basic_program_handle)
         glDrawElements(GL_TRIANGLES, len(self.floor.model.obj.indices),
@@ -492,11 +493,21 @@ class Renderer(Thread):
 
     # called by external threads
     def acquire_snapshot(self):
-        
         self.ss_update.acquire()
         self.ss_ready.acquire()
         self.ss_update.release()
-
+#         self.param_lock.acquire()
+        w, h = self.viewport_size
+        img = self.snapshot.crop((w, 0, w * 2, h)).load()
+        if max(img.getdata()) == 0:
+            raise RuntimeError("All black encountered")
+        img = img.transpose(Image.FLIP_TOP_BOTTOM)
+        return img
+    
+    def acquire_full_snapshot(self):
+        self.ss_update.acquire()
+        self.ss_ready.acquire()
+        self.ss_update.release()
 #         self.param_lock.acquire()
         img = self.snapshot.copy()
         if max(img.getdata()) == 0:
@@ -509,7 +520,7 @@ class Renderer(Thread):
         prev_buff_read = glGetIntegerv(GL_READ_BUFFER)
         glReadBuffer(GL_BACK)
         glFinish()
-        buff = glReadPixels(self.window.width, 0, self.window.width, 
+        buff = glReadPixels(0, 0, self.window.width, 
                          self.window.height, GL_RGB, GL_UNSIGNED_BYTE)
         glReadBuffer(prev_buff_read)
 #         glfw.swap_buffers(self.window.handle)

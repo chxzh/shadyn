@@ -856,7 +856,7 @@ class Optimizer(Thread):
             }
     ### end of Optimizer ###
 
-
+# obsolete
 class Renderer(Thread):
     @classmethod
     def shadow_proj_mat(cls, plane_normal, plane_point, light_pos):
