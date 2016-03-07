@@ -153,6 +153,12 @@ class Renderer(Thread):
             if not self._energy_terms.has_key(name):
                 self._energy_terms[name] = -23.3
         pass
+    
+    def set_penalty_terms(self, names):
+        for name in names:
+            if not self._extern_penalty_terms.has_key(name):
+                self._extern_penalty_terms[name] = -23.3
+        pass
 
     def init(self):
         # windows initialization
@@ -311,9 +317,25 @@ class Renderer(Thread):
         self.extern_param_bar = atb.Bar(name="extern_param", label="evals", help="Scene atb",
                            position=(10, 10), size=(200,300))
         self.extern_param_bar.add_var("total", getter=self.get_total, precision=6)
-        self.extern_param_bar.add_separator("separator")
-        for name in self._energy_terms:
-            self.extern_param_bar.add_var(name, getter=self._disp_getter_closure(name))
+        
+        # external defined energy terms
+        self.extern_param_bar.add_separator("")
+        for i, name in enumerate(self._energy_terms):
+            self.extern_param_bar.add_var(name="energy_term_%d" % i, label=name, 
+                    getter=self._disp_getter_closure(self._energy_terms, name))
+        
+        # external defined penalties
+        self.extern_param_bar.add_separator("")
+        for i, name in enumerate(self._extern_penalty_terms):
+            self.extern_param_bar.add_var(name="extern_penalty_%d" % i, label=name,
+                    getter=self._disp_getter_closure(self._extern_penalty_terms, name))
+        
+        # internal penalties
+        self.extern_param_bar.add_separator("")
+        for i, name in enumerate(self._intern_penalty_terms):
+            self.extern_param_bar.add_var(name="intern_penalty_%d" % i, label=name,
+                    getter=self._disp_getter_closure(self._intern_penalty_terms, name))
+         
         atb.TwDefine("extern_param refresh=0.1")
         pass
     
@@ -323,8 +345,7 @@ class Renderer(Thread):
     def set_total(self, total):
         self.total = total
     
-    def _disp_getter_closure(self, name):
-        dict = self._energy_terms # needs initialize somehow somewhere else
+    def _disp_getter_closure(self, dict, name):
         def getter():
             return dict[name]
         return getter
@@ -378,6 +399,8 @@ class Renderer(Thread):
         self._items = []
         self._cont_flag = True
         self._energy_terms = {}
+        self._extern_penalty_terms = {}
+        self._intern_penalty_terms = {"shadow_distance": -23.3}
     
     def stop(self):
         self._cont_flag = False
@@ -584,6 +607,9 @@ class Renderer(Thread):
 
 def _main():
     renderer = Renderer()
+    renderer.set_energy_terms(['energy_1', 'energy_2', 'energy_3'])
+    renderer.set_penalty_terms(['energy_1', 'energy_2', 'energy_3'])
+    
     renderer.start()
 #     from shadow_optim import MyGUI
 #     gui = MyGUI(renderer)
