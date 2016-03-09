@@ -12,6 +12,7 @@ import atb
 from datetime import datetime as dt
 from cgkit.fob import POSITION
 from random import random, randint
+from cal import *
 
 class Renderer(Thread):
     @classmethod
@@ -127,7 +128,11 @@ class Renderer(Thread):
         
         def bind(self, model):
             pass
-    
+        
+    class _Background_shader:
+        def __init__(self, vert_path, frag_path):
+            self.handle = tools.load_program(vert_path, frag_path)
+            
     class _Shader:
         # a specific wrapping for standard shading
         def __init__(self, vert_path, frag_path):
@@ -296,18 +301,56 @@ class Renderer(Thread):
         glEnableVertexAttribArray(self.basic_v_loc)
         glBindBuffer(GL_ARRAY_BUFFER, self.cube_model.v_buffer)
         glVertexAttribPointer(self.basic_v_loc, 3, GL_FLOAT, GL_FALSE, 0, None)
-
+        
+        self.background_indices = range(4) # will use triangle fans
+        far_end = 1 - 1e-4
+        self.background_vert = [-1.,  1.,  far_end,
+                                 1.,  1.,  far_end,
+                                 1., -1.,  far_end,
+                                -1., -1.,  far_end] # in clip coordinates
+        self.background_uvs = [0., 1.,
+                               1., 1.,
+                               1., 0.,
+                               0., 0.]
+        self.bg_shader = self._Background_shader("../shader/background.v.glsl", 
+                                                 "../shader/background.f.glsl")
+        self.background_vao_handle = glGenVertexArrays(1)
+        glBindVertexArray(self.background_vao_handle)
+        self.bg_i_buffer = glGenBuffers(1)
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.bg_i_buffer)
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+                     (c_ushort * len(self.background_indices))(*self.background_indices),
+                     GL_STATIC_DRAW)
+        self.bg_v_buffer = glGenBuffers(1)
+        glBindBuffer(GL_ARRAY_BUFFER, self.bg_v_buffer)
+        glBufferData(GL_ARRAY_BUFFER,
+                     (c_float * len(self.background_vert))(*self.background_vert),
+                     GL_STATIC_DRAW)
+        # uv buffer
+        self.bg_uv_buffer = glGenBuffers(1)
+        glBindBuffer(GL_ARRAY_BUFFER, self.bg_uv_buffer)
+        glBufferData(GL_ARRAY_BUFFER,
+                     (c_float * len(self.background_uvs))(*self.background_uvs),
+                     GL_STATIC_DRAW)
+        self.bg_tex_handle = glGenTextures(1)
+        glBindTexture(GL_TEXTURE_2D, self.bg_tex_handle)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+        im = self.bg_img
+        ix, iy, image = im.size[0], im.size[1], im.tostring("raw", "L", 0, -1)
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, ix, iy, 0, GL_RED, GL_UNSIGNED_BYTE, image)
         # initializing other stuff
         glEnable(GL_DEPTH_TEST)
         glDepthFunc(GL_LESS)
         glEnable(GL_CULL_FACE)
-
+        
         
 #         _init_X_Y(self.window.width, self.window.height)
 
 #         self._X = np.arange(self.window.width).reshape(1,self.window.width)
 #         self._Y = np.arange(self.window.height).reshape(self.window.height,1)
         self.init_atb()
+        self._init_target_image
     
     def init_atb(self):
 #         atb.init() # cannot tell what for, given by the binding author
@@ -355,30 +398,39 @@ class Renderer(Thread):
         mat_view = self.cam_cap.view_mat
         mat_proj = self.cam_cap.proj_mat
         w, h = self.viewport_size
-        # mat_c2s is projection from clip coordinate to image coordinate
-        mat_c2s = np.array([[(w-1)/2, 0, 0, (w-1)/2],
-                            [0, (1-h)/2, 0, (h-1)/2],
-                            [0,       0, 0,       0],
-                            [0,       0, 0,       1]])
-        mat_c2s *= np.array(mat_proj * mat_view * mat_shaj).T # cgkit.mat4 is column major
+        # mat_c2s is projection from clip coordinate to screen coordinate
+        mat_c2s = mat4([[(w-1)/2, 0, 0, (w-1)/2],
+                        [0, (1-h)/2, 0, (h-1)/2],
+                        [0,       0, 0,       0],
+                        [0,       0, 0,       1]])
+        mat_c2s = mat_c2s.transpose() # cgkit.mat4 initialization is column major
+        mat_c2s = mat_c2s * mat_proj * mat_view * mat_shaj
         return mat_c2s
     
     def model_center_penalty_closure(self, img):
         # presuming the camera for capturing, light and receiver won't move
         # or otherwise all the mat shall be computed on the fly
-        mat_c2s = self.get_mat_model2snapshot(img)
+        mat_c2s = self.get_mat_model2snapshot()
+        fst_moment = get_fst_moments(img)
         def model_center_penalty(x):
-            positions = self._strip_positions(x)
-            
+            position = self._items[0].position
+            position = mat_c2s*position
+            self._intern_penalty_terms['x'] = position.x - fst_moment[0]
+            self._intern_penalty_terms['y'] = position.y - fst_moment[1]
             return 0
         return model_center_penalty
     
-    # obsolete
-    def set_target_image(self, filepath):
-        self.image_target = Image.open(filepath)
-        self.image_target = self.image_target.convert("L")
-        # TODO: process image if unmatch with
+    def set_target_image(self, img):
+        self.image_target = img
+        # maybe some other preprocessing
+    
+    def _init_target_image(self):
+        self.scene_penalty = self.model_center_penalty_closure(self.image_target)
 
+    def scene_penalty(self):
+        # simply a place holder, will be replaced by setting image for
+        return 0 
+        
     def __init__(self):
         Thread.__init__(self)
         if not glfw.init():
@@ -400,7 +452,8 @@ class Renderer(Thread):
         self._cont_flag = True
         self._energy_terms = {}
         self._extern_penalty_terms = {}
-        self._intern_penalty_terms = {"shadow_distance": -23.3}
+        self._intern_penalty_terms = {"shadow_distance": -23.3, 'x': -23.3, 'y': -23.3}
+        self.bg_img = None
     
     def stop(self):
         self._cont_flag = False
@@ -444,7 +497,7 @@ class Renderer(Thread):
         glDrawElements(GL_TRIANGLES, len(self.floor.model.obj.indices),
                         GL_UNSIGNED_SHORT, None)
         glDisable(GL_CULL_FACE)
-        # draw the projected shadows
+        # draw the projected shadows8
         glUseProgram(self.shadow_program_handle)
         glUniform3f(self.shadow.color_loc, 0.0, 0.0, 0.0)  # black shadow
 #         glUniform1f(self.shadow.alpha_loc, 0.5)
@@ -455,16 +508,52 @@ class Renderer(Thread):
             glDrawElements(GL_TRIANGLES, len(item.model.obj.indices),
                             GL_UNSIGNED_SHORT, None)
 
-        
         glViewport(w, 0, w, h)
         glDisable(GL_CULL_FACE)
-        glUseProgram(self.basic_program_handle)
-        glDrawElements(GL_TRIANGLES, len(self.floor.model.obj.indices),
-                        GL_UNSIGNED_SHORT, None)
+        
+#         glUseProgram(self.basic_program_handle)
+#         # needs binding the floor
+#         glDrawElements(GL_TRIANGLES, len(self.floor.model.obj.indices),
+#                         GL_UNSIGNED_SHORT, None)
+        
+        glUseProgram(self.bg_shader.handle)
+        glBindVertexArray(self.background_vao_handle)
+#         glBindVertexArray(self.floor.model.vao_handle)
+        v_loc = glGetAttribLocation(self.bg_shader.handle, "coord3d")
+        glEnableVertexAttribArray(v_loc)
+        glBindBuffer(GL_ARRAY_BUFFER, self.bg_v_buffer)
+#         glBindBuffer(GL_ARRAY_BUFFER, self.floor.model.v_buffer)
+        glVertexAttribPointer(v_loc, 3, GL_FLOAT, GL_FALSE, 0, None)
+#         uv_loc = glGetAttribLocation(self.bg_shader.handle, "vertexUV")
+        uv_loc = 2
+        glEnableVertexAttribArray(uv_loc)
+        glBindBuffer(GL_ARRAY_BUFFER, self.bg_uv_buffer)
+        glVertexAttribPointer(uv_loc, 2, GL_FLOAT, GL_FALSE, 0, None)
+        bg_tex_loc = glGetUniformLocation(self.bg_shader.handle, "bg_tex")
+        glUniform1i(bg_tex_loc, 0)
+        glActiveTexture(GL_TEXTURE0)
+        glBindTexture(GL_TEXTURE_2D, self.bg_tex_handle)
+        glDrawElements(GL_TRIANGLE_FAN, len(self.background_indices), GL_UNSIGNED_SHORT, None)
+
+
+#         glPushMatrix()  
+#         glLoadIdentity()
+#         glBegin(GL_TRIANGLES)
+#         glColor3f(1., 0., 0.)
+#         glVertex3f(-1., 1., 0.)
+#         glVertex3f(1., -1., 0.)
+#         glVertex3f(1., 1., 0.)
+#         glEnd()
+#         glPopMatrix()
+        
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glUseProgram(self.shadow_program_handle)
         glEnable(GL_CULL_FACE)
         glUniform3f(glGetUniformLocation(self.shadow.handle, "shadowColor"),
-                    0.0, 0.0, 0.0)  # black shadow
+                    0.0, 1.0, 1.0)  # black shadow
+        glUniform1f(glGetUniformLocation(self.shadow.handle, "alpha"),
+                    0.75)
         for item in self._items:
             self.shadow.bind(item.model)
             glUniformMatrix4fv(self.shadow.MsVP_loc, 1, GL_FALSE,
@@ -474,16 +563,20 @@ class Renderer(Thread):
     #         glUniformMatrix4fv(shadow_VP_loc, 1, GL_FALSE, VP_mat_top.toList())
             glDrawElements(GL_TRIANGLES, len(item.model.obj.indices),
                             GL_UNSIGNED_SHORT, None)
+        glDisable(GL_BLEND)
         
         glViewport(w*2, 0, w/2, h/2)
         glDisable(GL_CULL_FACE)
         glUseProgram(self.basic_program_handle)
         glDrawElements(GL_TRIANGLES, len(self.floor.model.obj.indices),
                         GL_UNSIGNED_SHORT, None)
+        
         glUseProgram(self.shadow_program_handle)
         glEnable(GL_CULL_FACE)
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glUniform1f(glGetUniformLocation(self.shadow.handle, "alpha"),
+                    1.)
         glLineWidth(2)
         for item in self._items:
             self.shadow.bind(item.model)
@@ -520,8 +613,10 @@ class Renderer(Thread):
         self.ss_ready.acquire()
         self.ss_update.release()
 #         self.param_lock.acquire()
+        band_index = 0 # using red band to store a shadow
         w, h = self.viewport_size
         img = self.snapshot.crop((w, 0, w * 2, h)).load()
+        img = img.split()[0]
         if max(img.getdata()) == 0:
             raise RuntimeError("All black encountered")
         img = img.transpose(Image.FLIP_TOP_BOTTOM)
@@ -549,7 +644,6 @@ class Renderer(Thread):
 #         glfw.swap_buffers(self.window.handle)
         img = Image.fromstring(mode="RGB", data=buff, 
                               size=(self.window.width, self.window.height))
-        img = img.convert("L")
 #         self.param_lock.release()
         self.snapshot = img
     
@@ -609,8 +703,13 @@ def _main():
     renderer = Renderer()
     renderer.set_energy_terms(['energy_1', 'energy_2', 'energy_3'])
     renderer.set_penalty_terms(['energy_1', 'energy_2', 'energy_3'])
-    
+    im = Image.open("..\\img\\target_mickey.png")
+    im = im.convert('L')
+    renderer.set_target_image(im)
+    renderer.bg_img = im
     renderer.start()
+    renderer.wait_till_init()
+#     renderer.scene_penalty(1)
 #     from shadow_optim import MyGUI
 #     gui = MyGUI(renderer)
 #     gui.run()
