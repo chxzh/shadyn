@@ -1,6 +1,9 @@
 '''
 module holding all case-irrelevant calculations
 '''
+from PIL import Image
+from scipy import optimize
+import numpy as np
 def scipy_optimize(name):
     def fmin(f, x):
         res = optimize.minimize(fun=f, x0=x, method=name)
@@ -63,7 +66,7 @@ def _get_sec_moments(image):
     m_11 = (X_offset*img*Y_offset).sum() / M_00 if M_00 else 0
     return np.array([m_20, m_11, m_02])    
     
-def _get_fst_moments(image):
+def get_fst_moments(image):
     # image should be a gray scale Image object
     img = 1 - np.array(image.getdata()) / 128 # turn white to 0 and black to 1
     # using 128 in case of gray
@@ -71,12 +74,12 @@ def _get_fst_moments(image):
     width, height = image.size
     img = img.reshape(height, width)
     M_00 = float(img.sum())        
-#     if _X == None or _Y == None:
-#         _init_X_Y(width, height)
+    if _X == None or _Y == None:
+        _init_X_Y(width, height)
     M_10 = (_X * img).sum()
     M_01 = (img * _Y).sum()
-    m_10 = M_10 / M_00 / 640 if M_00 else 0
-    m_01 = M_01 / M_00 / 480 if M_00 else 0
+    m_10 = M_10 / M_00 if M_00 else 0
+    m_01 = M_01 / M_00 if M_00 else 0
     return np.array([m_10, m_01])
 
 from PIL import ImageMath as imath    
