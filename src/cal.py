@@ -39,13 +39,13 @@ def _sq_diff(a, b):
 
 _X, _Y = None, None
 
-def _init_X_Y(width, height):
+def init_X_Y(width, height):
     # will be called by renderer when the initialization is done
     global _X, _Y
     _X = np.arange(width).reshape(1, width)
     _Y = np.arange(height).reshape(height, 1)
         
-def _get_sec_moments(image):
+def get_sec_moments(image):
     # image should be a gray scale Image object
     img = 1 - np.array(image.getdata()) / 128 # turn white to 0 and black to 1
     # using 128 in case of gray
@@ -75,7 +75,7 @@ def get_fst_moments(image):
     img = img.reshape(height, width)
     M_00 = float(img.sum())        
     if _X == None or _Y == None:
-        _init_X_Y(width, height)
+        init_X_Y(width, height)
     M_10 = (_X * img).sum()
     M_01 = (img * _Y).sum()
     m_10 = M_10 / M_00 if M_00 else 0
@@ -83,13 +83,13 @@ def get_fst_moments(image):
     return np.array([m_10, m_01])
 
 from PIL import ImageMath as imath    
-def _xor_closure(target):
+def xor_closure(target):
     def _get_xor(image):
         xor_img = imath.eval("a^b", a=image, b=target)
         return sum(xor_img.getdata()) / (640*480)
     return _get_xor
 
-def _sq_diff_closure(func):
+def sq_diff_closure(func):
     def sub_closure(target):
         res_t = func(target)
         def sqdiff(image):

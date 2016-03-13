@@ -5,6 +5,7 @@ from rendering import Renderer
 from datetime import datetime as dt
 from itertools import product
 from tools import get_fname
+from cal import *
 def get_renderer():
     renderer = Renderer()
     renderer.start()
@@ -42,10 +43,12 @@ def all_single_energy_combos():
 def vanilla():
     renderer = Renderer()
     renderer.set_energy_terms(Optimizer.energy_dic.keys())
+    from PIL import Image
+    renderer.set_target_image(Image.open("..\\img\\target_mickey.png").convert('L'))
     renderer.start()
     renderer.wait_till_init()
     import shadow_optim
-    shadow_optim._init_X_Y(renderer.window.width, renderer.window.height)
+    init_X_Y(*renderer.viewport_size)
     plotter = plotting.Plotter(*get_fname("..\\res"))
     optimizer = Optimizer(renderer)
     plotting.attach_plotter(optimizer, plotter)

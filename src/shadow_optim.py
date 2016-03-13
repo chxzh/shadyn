@@ -772,9 +772,13 @@ class Optimizer(Thread):
         self._iter_callback = callback
         self._iter_callback_args = args
     
+    # TODO: penalty could be listed
     penalty_weight = 1e-3
+    penalty_name = "penalty"
     def penalty(self, x):
-        return sum(x**2) * self.penalty_weight
+        res = sum(x**2) * self.penalty_weight
+        self.renderer.set_panelty_value(self.penalty_name, res)
+        return res
     
     def get_mat_model2snapshot(self, img):
         mat_shaj = self.renderer.shadow.shaject_mat
@@ -829,6 +833,8 @@ class Optimizer(Thread):
         @wraps(f)
         def inner(cls, x):
             res = f(cls, x)
+            for y, w, n in res:
+                cls.renderer.set_energy_value(name=n, val=y*w)
             total = sum([w*y for y, w, n in res]) + cls.penalty(x)
             cls.renderer.set_total(total)
             return total
@@ -851,9 +857,9 @@ class Optimizer(Thread):
     energy function value based on input image.
     '''
     energy_dic = {
-                "XOR comparison": _xor_closure,
-                "first moments (normalized)": _sq_diff_closure(_get_fst_moments),
-                "secondary moments (normalized)": _sq_diff_closure(_get_sec_moments)
+                "XOR comparison": xor_closure,
+                "first moments (normalized)": sq_diff_closure(get_fst_moments),
+                "secondary moments (normalized)": sq_diff_closure(get_sec_moments)
             }
     ### end of Optimizer ###
 

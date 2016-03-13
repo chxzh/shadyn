@@ -159,6 +159,18 @@ class Renderer(Thread):
                 self._energy_terms[name] = -23.3
         pass
     
+    def set_energy_value(self, name, val):
+        try:
+            self._energy_terms[name] = val
+        except KeyError:
+            pass
+
+    def set_penalty_value(self, name, val):
+        try:
+            self._extern_penalty_terms[name] = val
+        except KeyError:
+            pass
+    
     def set_penalty_terms(self, names):
         for name in names:
             if not self._extern_penalty_terms.has_key(name):
@@ -336,9 +348,15 @@ class Renderer(Thread):
         glBindTexture(GL_TEXTURE_2D, self.bg_tex_handle)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
-        im = self.bg_img
-        ix, iy, image = im.size[0], im.size[1], im.tostring("raw", "L", 0, -1)
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, ix, iy, 0, GL_RED, GL_UNSIGNED_BYTE, image)
+        try:
+            im = self.bg_img
+            ix, iy, image = im.size[0], im.size[1], im.tostring("raw", "L", 0, -1)
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, ix, iy, 0,
+                         GL_RED, GL_UNSIGNED_BYTE, image)
+        except AttributeError: # target image as comparison background is not set
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, 1, 1, 0,
+                         GL_RED, GL_UNSIGNED_BYTE, '\xff')
+#             raise RuntimeError()
         # initializing other stuff
         glEnable(GL_DEPTH_TEST)
         glDepthFunc(GL_LESS)
@@ -422,6 +440,7 @@ class Renderer(Thread):
     
     def set_target_image(self, img):
         self.image_target = img
+        self.bg_img = img
         # maybe some other preprocessing
     
     def _init_target_image(self):
@@ -615,7 +634,8 @@ class Renderer(Thread):
 #         self.param_lock.acquire()
         band_index = 0 # using red band to store a shadow
         w, h = self.viewport_size
-        img = self.snapshot.crop((w, 0, w * 2, h)).load()
+        img = self.snapshot.crop((w, 0, w * 2, h))
+        img.load()
         img = img.split()[0]
         if max(img.getdata()) == 0:
             raise RuntimeError("All black encountered")
@@ -705,8 +725,8 @@ def _main():
     renderer.set_penalty_terms(['energy_1', 'energy_2', 'energy_3'])
     im = Image.open("..\\img\\target_mickey.png")
     im = im.convert('L')
-    renderer.set_target_image(im)
-    renderer.bg_img = im
+#     renderer.set_target_image(im)
+#     renderer.bg_img = im
     renderer.start()
     renderer.wait_till_init()
 #     renderer.scene_penalty(1)
