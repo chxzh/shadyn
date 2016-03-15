@@ -9,3 +9,5 @@ src/EXAMPLE.log
 
 *.log
 src/ice_bear.jpg
+src/plot_example.py
+img/target_mickey.png

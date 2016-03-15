@@ -52,11 +52,17 @@ class Plotter():
         with open(self._fname+'.xs', 'wb') as handle:
             pickle.dump(self._x_records, handle)
         # plot the things
-        plt.plot(np.log10(self._eval_sum_records), label="sum")
+        
+        plt.figure(figsize=(16, 12))
+        ax = plt.subplot(111)  
+        plt.plot(np.log10(self._eval_sum_records), label="total")
         for term, name in zip(self._eval_term_records, self._term_names):
-            plt.plot(np.log10(term), label=name)
-        plt.legend(bbox_to_anchor=(0., 1.05, 1., .102), loc=3,
-               ncol=2, borderaxespad=0.)
+            ax.plot(np.log10(term), label=name)
+        box = ax.get_position()
+        ax.set_position([box.x0, box.y0 - box.height * 0.05,
+                         box.width, box.height*0.95])
+        ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.2),
+                  fancybox=True, shadow=True, ncol=2)
         plt.title(self._method_name, y=-0.1)
         plt.savefig(self._path+"\\..\\"+self._time_stamp+'.png')
         plt.savefig(self._fname+'.png')
@@ -117,6 +123,8 @@ def plot_task(f):
             cls.plotter.plot_result()
             img = cls.renderer.acquire_snapshot()
             img.save(cls.plotter._path + "\\final_result_snapshot.png") # TODO: ehh
+            img = cls.renderer.acquire_full_snapshot()
+            img.save(cls.plotter._path + "\\final_full_snapshot.png") # TODO: ehh II
 
     return inner
 
