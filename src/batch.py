@@ -6,6 +6,7 @@ from datetime import datetime as dt
 from itertools import product
 from tools import get_fname
 from cal import *
+from astropy.units import second
 def get_renderer():
     renderer = Renderer()
     renderer.start()
@@ -43,11 +44,11 @@ def all_single_energy_combos():
 def vanilla():
     renderer = Renderer()
     renderer.set_energy_terms(Optimizer.energy_dic.keys())
+    renderer.set_penalty_terms(['penalty'])
     from PIL import Image
     renderer.set_target_image(Image.open("..\\img\\target_mickey.png").convert('L'))
     renderer.start()
     renderer.wait_till_init()
-    import shadow_optim
     init_X_Y(*renderer.viewport_size)
     plotter = plotting.Plotter(*get_fname("..\\res"))
     optimizer = Optimizer(renderer)
@@ -59,6 +60,26 @@ def vanilla():
                          [1,  1])
 #     optimizer.set_energy(["XOR comparison"], [1])
     optimizer.run()
+
+def renderer_only():
+    renderer = Renderer()
+    renderer.set_energy_terms(Optimizer.energy_dic.keys())
+    renderer.set_penalty_terms(['penalty'])
+    from PIL import Image
+    renderer.set_target_image(Image.open("..\\img\\target_mickey.png").convert('L'))
+    renderer.start()
+    renderer.wait_till_init()
+    return renderer
+
+def takeoff_and_destory():
+    first = renderer_only()
+    from time import sleep
+    sleep(1)
+    first.stop()
+    sleep(1)
+    second = renderer_only()
+    
+    
     
 def testing_moments():
     from PIL import Image
@@ -69,7 +90,8 @@ def testing_moments():
 
 def main():
 #     single_energy()
-    vanilla()
+#     vanilla()
+    takeoff_and_destory()
 #     single_energy_combo("Powell", "XOR comparison")
 #     testing_moments()
     pass

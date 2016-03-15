@@ -716,19 +716,22 @@ class Renderer(Thread):
             self.param_lock.release()
             err = glGetError()
             if err != GL_NO_ERROR: print "Encountered a glError:", err
+        atb.shutdown()
         glfw.terminate()
         pass
 
 def _main():
-    renderer = Renderer()
+    renderer = Renderer()   
     renderer.set_energy_terms(['energy_1', 'energy_2', 'energy_3'])
     renderer.set_penalty_terms(['energy_1', 'energy_2', 'energy_3'])
     im = Image.open("..\\img\\target_mickey.png")
     im = im.convert('L')
-#     renderer.set_target_image(im)
+    renderer.set_target_image(im)
 #     renderer.bg_img = im
     renderer.start()
     renderer.wait_till_init()
+    ss = renderer.acquire_snapshot()
+    ss.show()
 #     renderer.scene_penalty(1)
 #     from shadow_optim import MyGUI
 #     gui = MyGUI(renderer)
