@@ -76,7 +76,7 @@ def takeoff_and_destory():
     from time import sleep
     sleep(1)
     first.stop()
-    sleep(1)
+    first.wait_till_final()
     second = renderer_only()
     
     

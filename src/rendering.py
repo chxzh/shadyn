@@ -467,6 +467,8 @@ class Renderer(Thread):
         self.param_lock = Lock()
         self._init_finished_lock = Lock()
         self._init_finished_lock.acquire()
+        self._finalized_lock = Lock()
+        self._finalized_lock.acquire()
         self._items = []
         self._cont_flag = True
         self._energy_terms = {}
@@ -702,6 +704,12 @@ class Renderer(Thread):
             self._init_finished_lock.acquire()
             self._init_finished_lock.release()
         return
+    
+    def wait_till_final(self):
+        if self._finalized_lock.locked():
+            self._finalized_lock.acquire()
+            self._finalized_lock.release()
+        return
 
     def run(self):
 #         draw_projected_shadows()
@@ -718,6 +726,22 @@ class Renderer(Thread):
             if err != GL_NO_ERROR: print "Encountered a glError:", err
         atb.shutdown()
         glfw.terminate()
+        self._finalized_lock.release()
+        pass
+
+class Renderer_Dispatcher(Thread):
+    '''
+    the only interface to acquire rendering thread in the future, as renderer
+    factory. Will and must be run in main thread. Provide unified management
+    of OpenGL context, i.e. initializing and deconstructing renderer.
+    '''
+    def __init__(self):
+        pass
+    
+    def run(self):
+        pass
+    
+    def acquire(self):
         pass
 
 def _main():
