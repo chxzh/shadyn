@@ -782,6 +782,7 @@ class Renderer_dispatcher(Thread):
         self.last_instance_time = None
         self.stop_flag = False
         self.booting_lock = Lock()
+        self.callback_lock = Lock()
         self.energy_terms = None
         self.penalty_terms = None
         self.target_image = None
@@ -839,7 +840,8 @@ class Renderer_dispatcher(Thread):
         the former argument will be overwritten and the callback will be called
         only once
         '''
-        self.callbacks[callback] = (args, kwds)
+        with self.callback_lock:
+            self.callbacks[callback] = (args, kwds)
     
     def deregister(self, callback):
         del self.callbacks[callback]
@@ -863,9 +865,10 @@ class Renderer_dispatcher(Thread):
         # -- need to collect the parameters
         self.last_instance_time = dt.now()
         # call all registered callbacks
-        for callback, param in self.callbacks.iteritems():
-            args, kwds = param
-            callback(*args, **kwds)
+        with self.callback_lock:
+            for callback, param in self.callbacks.iteritems():
+                args, kwds = param
+                callback(*args, **kwds)
         pass
     
     
