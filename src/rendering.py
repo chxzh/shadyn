@@ -770,7 +770,7 @@ class Request_deque():
 class Renderer_dispatcher(Thread):
     '''
     the only interface to acquire rendering thread in the future, as renderer
-    factory. Will and must be run in main thread. Provide unified management
+    factory. Shall be a singleton. Provide unified management
     of OpenGL context, i.e. initializing and deconstructing renderer.
     '''
     def __init__(self):
@@ -824,7 +824,7 @@ class Renderer_dispatcher(Thread):
         return self.renderer # at this point renderer shall have been rebooted
     
     def acquire(self):
-        # TODO: acquire current one without booting unless it is None, blocked if under booting process
+        # acquire the current one without booting unless it is None, blocked if under booting process
         if self.booting_lock.locked():
             with self.booting_lock:
                 return self.renderer
@@ -844,10 +844,12 @@ class Renderer_dispatcher(Thread):
             self.callbacks[callback] = (args, kwds)
     
     def deregister(self, callback):
-        del self.callbacks[callback]
+        try:
+            del self.callbacks[callback]
+        except KeyError:
+            pass # doesn't matter
     
     def _reboot(self):
-        # only called by main thread
         # shut down the previous one if any
         if self.renderer:
             self.renderer.stop()
@@ -871,7 +873,7 @@ class Renderer_dispatcher(Thread):
                 callback(*args, **kwds)
         pass
     
-    
+    ### END OF Renderer_dispatcher
 
     
 

@@ -22,15 +22,18 @@ import log, plotting
 from functools import wraps
 from tools import get_fname
 from cal import *
+from rendering import Renderer, Renderer_dispatcher
 # log.init()
 
 qt_app = QApplication(sys.argv)
 class MyGUI(QWidget):
-    def __init__(self, renderer):
+    def __init__(self, rendis):
         QWidget.__init__(self)
-        self.renderer = renderer        
-        self.renderer.wait_till_init()
-        _init_X_Y(renderer.window.width, renderer.window.height)
+        if not rendis:
+            raise RuntimeError("renderer dispatcher is not provided")
+        self.rendis = rendis
+        self.renderer = rendis.acquire()
+        init_X_Y(*self.renderer.viewport_size)
         self._init_window()
         vbox = QVBoxLayout()
         left_boxes = [
@@ -118,7 +121,7 @@ class MyGUI(QWidget):
     def _on_play_pause(self):
         # not started
         if self._optimizer == None or not self._optimizer.is_alive():
-            self._optimizer = Optimizer(self.renderer)
+            self._optimizer = Optimizer(self.rendis)
             plotter = plotting.Plotter(*get_fname("..\\res"))
             plotting.attach_plotter(self._optimizer, plotter)
             # configuring the optimizer by feeding in optimizing-method and energy function
@@ -158,9 +161,10 @@ class MyGUI(QWidget):
     
     def _on_stop(self):
         # TODO: find a way to stop the optimization
-        if self.is_on_going: # the optimization is not paused
-            # locking the green light to pause the current optimization
-            self._optimizer.green_light.acquire()
+        if self._optimizer.stopable:
+            self._optimizer.stop()
+        else:
+            self._optimizer.pause()
         self._optimizer = None
         self._on_optim_done()
         
@@ -608,14 +612,14 @@ def cma_optimize(name): # name is unused
     
 
 class Optimizer(Thread):
-    def __init__(self, renderer=None):
+    def __init__(self, rendis):
         Thread.__init__(self)
         # only when green light is unlocked will the optimization continue
         self.green_light = Lock()
-        if renderer:
-            self.renderer = renderer
-        else:
-            self.renderer = Renderer()
+        if not rendis:
+            raise RuntimeError("Renderer dispatcher is not provided")
+        self.rendis = rendis
+        self.renderer = rendis.acquire()
         self._optim_method = lambda *x: None
         self._energy_list = []
         self.set_param = renderer.set_param
@@ -631,6 +635,8 @@ class Optimizer(Thread):
         self._eval_term_records = ()
         self._eval_sum_record = None
         self.result = None
+        self._stop_sign = False
+        self.stopable = False
     
     def _init_renderer(self, renderer=None):
         # if renderer != None, it is starting a new one
@@ -658,7 +664,7 @@ class Optimizer(Thread):
         else:
             pass
         # wrap optimizer with green_light
-        self._init_renderer()
+#         self._init_renderer(self.renderer)
         self.result = self._optim_method(x=self.renderer.get_param(),
                            f=err_func)
         self._finished_callback(*self._finished_callback_args)
@@ -689,6 +695,14 @@ class Optimizer(Thread):
         else:
             self.green_light.acquire()
     
+    def play(self):
+        if self.green_light.locked():
+            self.green_light.release()
+    
+    def pause(self):
+        if not self.green_light.locked():
+            self.green_light.acquire()
+    
     """
     method_dic is a mapping between optimizing method to a closure that takes
     the name (in some case like CMA, name doesn't affect anything) and returns
@@ -714,6 +728,7 @@ class Optimizer(Thread):
         # this is the interface for manager
         if name == "CMA":
             self._optim_method = self._explict_CMA
+            self.stopable = True
         else:
             self._optim_method = Optimizer.method_dic[name](name)
         self._method_name = name
@@ -725,11 +740,11 @@ class Optimizer(Thread):
             for x in solutions:
                 try:
                     yield f(x)
-                except:
+                except Exception as e:
                     # like encountering an all-black error
-                    self.renderer.stop()
-                    self._init_renderer(Renderer())
-                    self.renderer.wait_till_init()
+                    print e.message
+                    self.renderer = self.rendis.acquire_new()
+                    print "renderer reboot"
                     yield f(x)
         
         sigma_0 = 0.1
@@ -737,12 +752,21 @@ class Optimizer(Thread):
         opts = cma.CMAOptions()
         opts['ftarget'] = ftarget
         es = cma.CMAEvolutionStrategy(x, sigma_0, opts)
-        while not es.stop():
+        while not es.stop() or not self._stop_sign:
             solutions = es.ask()
             fvals = [y for y in generate(solutions)]
             es.tell(solutions, fvals)
         res = es.result()
         return res[0], res[1]
+    
+    def stop(self):
+        '''
+        Only works under using CMAES.
+        Called to terminate the current optimization thread. Note that the 
+        termination is not instant, but will wait for the last round of CMA
+        to finish.
+        '''
+        self._stop_sign = True
     
     @plotting.init_plot
     def set_energy(self, func_names, weights):
@@ -777,7 +801,7 @@ class Optimizer(Thread):
     penalty_name = "penalty"
     def penalty(self, x):
         res = sum(x**2) * self.penalty_weight
-        self.renderer.set_panelty_value(self.penalty_name, res)
+        self.renderer.set_penalty_value(self.penalty_name, res)
         return res
     
     def get_mat_model2snapshot(self, img):
@@ -864,7 +888,7 @@ class Optimizer(Thread):
     ### end of Optimizer ###
 
 # obsolete
-class Renderer(Thread):
+class _Renderer(Thread):
     @classmethod
     def shadow_proj_mat(cls, plane_normal, plane_point, light_pos):
         if type(plane_normal) == vec3:
@@ -1024,7 +1048,7 @@ class Renderer(Thread):
         glDepthFunc(GL_LESS)
         glEnable(GL_CULL_FACE)
         
-        _init_X_Y(self.window.width, self.window.height)
+        init_X_Y(self.window.width, self.window.height)
         self._X = np.arange(self.window.width).reshape(1,self.window.width)
         self._Y = np.arange(self.window.height).reshape(self.window.height,1)
     
@@ -1232,13 +1256,19 @@ class Renderer(Thread):
         glfw.terminate()
         pass
 
+def psudo_main(rendis):
+    gui = MyGUI(rendis)
+    gui.run()
+
+from thread import start_new_thread
 def _main():
-    renderer = Renderer()
-    renderer.start()
-    gui = MyGUI(renderer)
-#     gui = Weight_Dialog(['a','b','c', 'd','e','f','g'], np.array([0.03, 0.2, 0.2, 0.1, 0.05, 0.4, 0.02]))
+    rendis = Renderer_dispatcher()
+#     start_new_thread(psudo_main, (rendis,))
+    rendis.start()    
+    gui = MyGUI(rendis)
     gui.run()
     return
+
 
 if __name__ == "__main__":
     print "----------start of main---------"
