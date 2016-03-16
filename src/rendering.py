@@ -13,6 +13,9 @@ from datetime import datetime as dt
 from cgkit.fob import POSITION
 from random import random, randint
 from cal import *
+from _collections import deque
+from boto.ec2.autoscale.request import Request
+from idlelib.rpc import request_queue
 
 class Renderer(Thread):
     @classmethod
@@ -735,14 +738,98 @@ class Renderer_Dispatcher(Thread):
     factory. Will and must be run in main thread. Provide unified management
     of OpenGL context, i.e. initializing and deconstructing renderer.
     '''
+    from threading import Semaphore, Lock
+    from datatime import datetime as dt
+    class Request_deque(Semaphore):
+        from collections import deque
+        def __init__(self, value=1):
+            Semaphore.__init__(self, value)
+            time_stamp_q = deque()
+        
+        def acquire(self, blocking=True):
+            if Semaphore.acquire(self, blocking):
+                # released under blocked mode or happened to have spare under
+                # non-blocking mode
+                return True, time_stamp_q.popleft()
+            else:
+                # 
+                return False, None
+        
+        def release(self, stop=False):
+            if stop:
+                self.time_stamp_q.append(None)
+            else:
+                self.time_stamp_q.append(dt.now())
+            Semaphore.release(self)
+    
+    
     def __init__(self):
+        Thread.__init__(self)
+        self.callbacks = {}
+        self.renderer = None
+        self.requests = Request_queue(0)
+        self.response = Semaphore(0)
+        self.last_instance_time = None
+        self.stop_flag = False
         pass
+    
+    def stop(self):
+        self.stop = True
+        self.renderer.stop()
+        self.renderer.wait_till_final()
+        self.requests.release(stop=True) # in case dispatcher is blocked.
     
     def run(self):
+        while not self.stop: # in case block in handling request, a false request will be pushed
+            # handling request
+            status, timest = self.requests.acquire()
+            if status and not timest:
+                # false request encountered
+                break
+            # reboot a renderer
+            if not self.last_instance_time\
+                    or timest > self.last_instance_time:
+                # only reboot when the last instance is created far ago
+                # in-another way: don't reboot if we just did - multiple duplicate
+                # request could come in in a a short time if the shared renderer
+                # screw up
+                self._reboot()
+            self.response.release()
+                
+        return
+    
+    def acquire_new(self):
+        # TODO: need to put arguments to construct a renderer
         pass
     
-    def acquire(self):
+    def register(self, callback, *args, **kwds):
+        '''
+        callback will be invoke when the renderer is rebooted.
+        re-registering same callback with different argument is not supported,
+        the former argument will be overwritten and the callback will be called
+        only once
+        '''
+        self.callbacks[callback] = (args, kwds)
+    
+    def unregister(self, callback):
+        del self.callbacks[callback]
+    
+    def _reboot(self):
+        # shut down the previous one
+        if self.renderer:
+            self.renderer.stop()
+            self.renderer.wait_till_final()
+        # boot the renderer
+        #TODO
+        # -- need to collect the parameters
+        self.last_instance_time = dt.now()
+        # call all registered callbacks
+        for callback, param in self.callbacks.iteritems():
+            args, kwds = param
+            callback(*args, **kwds)
         pass
+
+    
 
 def _main():
     renderer = Renderer()   
