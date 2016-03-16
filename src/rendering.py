@@ -442,6 +442,8 @@ class Renderer(Thread):
         return model_center_penalty
     
     def set_target_image(self, img):
+        if img.getbands() != ('L',):
+            img = img.convert('L')
         self.image_target = img
         self.bg_img = img
         # maybe some other preprocessing
@@ -732,55 +734,67 @@ class Renderer(Thread):
         self._finalized_lock.release()
         pass
 
-class Renderer_Dispatcher(Thread):
+
+from threading import Semaphore, Lock
+from datetime import datetime as dt
+class Request_deque():
+    from collections import deque
+    def __init__(self, value=1):
+        self.sema = Semaphore(value)
+        self.time_stamp_q = deque()
+        self.sync_lock = Lock()
+    
+    def acquire(self, blocking=True):
+        if self.sema.acquire(blocking):
+            # released under blocked mode or happened to have spare under
+            #non-blocking mode
+            return True, self.time_stamp_q.popleft()
+        else:                    
+            # non-blocking mode with unsuccessful acquiring
+            return False, None
+    
+    def release(self, stop=False):
+        with self.sync_lock:
+            # need to guarantee the order matching between request and time
+            #stamp, the operation shall be atomic. This could be rare to have
+            #but unaffordable if any.
+            if stop:
+                self.time_stamp_q.append(None)
+            else:
+                self.time_stamp_q.append(dt.now())
+            self.sema.release()
+            
+    ### END OF Request_deque
+
+
+class Renderer_dispatcher(Thread):
     '''
     the only interface to acquire rendering thread in the future, as renderer
     factory. Will and must be run in main thread. Provide unified management
     of OpenGL context, i.e. initializing and deconstructing renderer.
     '''
-    from threading import Semaphore, Lock
-    from datatime import datetime as dt
-    class Request_deque(Semaphore):
-        from collections import deque
-        def __init__(self, value=1):
-            Semaphore.__init__(self, value)
-            time_stamp_q = deque()
-        
-        def acquire(self, blocking=True):
-            if Semaphore.acquire(self, blocking):
-                # released under blocked mode or happened to have spare under
-                # non-blocking mode
-                return True, time_stamp_q.popleft()
-            else:
-                # 
-                return False, None
-        
-        def release(self, stop=False):
-            if stop:
-                self.time_stamp_q.append(None)
-            else:
-                self.time_stamp_q.append(dt.now())
-            Semaphore.release(self)
-    
-    
     def __init__(self):
         Thread.__init__(self)
         self.callbacks = {}
         self.renderer = None
-        self.requests = Request_queue(0)
+        self.requests = Request_deque(0)
         self.response = Semaphore(0)
         self.last_instance_time = None
         self.stop_flag = False
+        self.booting_lock = Lock()
+        self.energy_terms = None
+        self.penalty_terms = None
+        self.target_image = None
         pass
     
     def stop(self):
-        self.stop = True
+        self.stop_flag = True
         self.renderer.stop()
         self.renderer.wait_till_final()
         self.requests.release(stop=True) # in case dispatcher is blocked.
     
     def run(self):
-        while not self.stop: # in case block in handling request, a false request will be pushed
+        while not self.stop_flag: # in case block in handling request, a false request will be pushed
             # handling request
             status, timest = self.requests.acquire()
             if status and not timest:
@@ -795,12 +809,28 @@ class Renderer_Dispatcher(Thread):
                 # screw up
                 self._reboot()
             self.response.release()
-                
         return
     
-    def acquire_new(self):
-        # TODO: need to put arguments to construct a renderer
-        pass
+    def acquire_new(self, energy_terms=None, penalty_terms=None, target_image=None):
+        # note that the parameters will be overwritten by the later request if the
+        #rebooting process is not finished, ending at having one with different parameter
+        #than requested. This is terrible but I cannot figure any better way.
+        if energy_terms: self.energy_terms = energy_terms
+        if penalty_terms: self.penalty_terms = penalty_terms
+        if target_image: self.target_image = target_image
+        self.requests.release() # posting a reboot request
+        self.response.acquire() # wait until the request has been responded
+        return self.renderer # at this point renderer shall have been rebooted
+    
+    def acquire(self):
+        # TODO: acquire current one without booting unless it is None, blocked if under booting process
+        if self.booting_lock.locked():
+            with self.booting_lock:
+                return self.renderer
+        elif self.renderer:
+            return self.renderer
+        else:
+            return self.acquire_new()
     
     def register(self, callback, *args, **kwds):
         '''
@@ -811,16 +841,25 @@ class Renderer_Dispatcher(Thread):
         '''
         self.callbacks[callback] = (args, kwds)
     
-    def unregister(self, callback):
+    def deregister(self, callback):
         del self.callbacks[callback]
     
     def _reboot(self):
-        # shut down the previous one
+        # only called by main thread
+        # shut down the previous one if any
         if self.renderer:
             self.renderer.stop()
             self.renderer.wait_till_final()
         # boot the renderer
-        #TODO
+        self.renderer = Renderer()
+        if self.energy_terms:
+            self.renderer.set_energy_terms(self.energy_terms)
+        if self.penalty_terms:
+            self.renderer.set_penalty_terms(self.penalty_terms)
+        if self.target_image:
+            self.target_image.set_target_image(self.target_image)
+        self.renderer.start()
+        self.renderer.wait_till_init()
         # -- need to collect the parameters
         self.last_instance_time = dt.now()
         # call all registered callbacks
@@ -828,6 +867,8 @@ class Renderer_Dispatcher(Thread):
             args, kwds = param
             callback(*args, **kwds)
         pass
+    
+    
 
     
 

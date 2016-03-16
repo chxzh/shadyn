@@ -1,7 +1,7 @@
 import os, plotting, log
 from shadow_optim import Optimizer
 # from shadow_optim import Renderer
-from rendering import Renderer
+from rendering import Renderer, Renderer_dispatcher
 from datetime import datetime as dt
 from itertools import product
 from tools import get_fname
@@ -78,7 +78,29 @@ def takeoff_and_destory():
     first.stop()
     first.wait_till_final()
     second = renderer_only()
+
+def dispatcher_vanilla():
+    from threading import Thread
+    class Client(Thread):
+        def __init__(self, dispatcher):
+            Thread.__init__(self)
+            self.dispatcher = dispatcher
+        
+        def run(self):
+            from time import sleep
+            print "start acq"
+            renderer = self.dispatcher.acquire()
+            print "got one"
+            sleep(2)
+            renderer = self.dispatcher.acquire()
+            renderer = self.dispatcher.acquire_new(energy_terms=['eng1', 'eng2'])
+            sleep(2)
+            self.dispatcher.stop()
     
+    dispatcher = Renderer_dispatcher()
+    client = Client(dispatcher)
+    client.start()
+    dispatcher.run()
     
     
 def testing_moments():
@@ -91,7 +113,8 @@ def testing_moments():
 def main():
 #     single_energy()
 #     vanilla()
-    takeoff_and_destory()
+#     takeoff_and_destory()
+    dispatcher_vanilla()
 #     single_energy_combo("Powell", "XOR comparison")
 #     testing_moments()
     pass
