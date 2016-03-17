@@ -40,7 +40,7 @@ class MyGUI(QWidget):
                  self._init_set_target(),
                  self._init_select_method(),
                  self._init_select_energy(),
-                 self._init_set_param()
+                 self._init_target_preview()
                  ]
         for box in left_boxes:
             vbox.addLayout(box)
@@ -51,7 +51,7 @@ class MyGUI(QWidget):
         
         vbox = QVBoxLayout()
         right_boxes = [
-                       self._init_target_preview()
+                 self._init_set_param()
                        ]
         for box in right_boxes:
             vbox.addLayout(box)
@@ -95,10 +95,12 @@ class MyGUI(QWidget):
         # TODO: deal with cases when the image is unfit
     
     def _init_target_preview(self):
-        self.target_preview_label = QLabel("this is where preview of the target image should be showed",self)        
-        self.target_preview_label.setGeometry(10, 30, 640, 480)
+        self.target_preview_label = QLabel(self)        
+        self.target_preview_label.setGeometry(10, 30, 480, 480)
         vbox = QVBoxLayout()
-        vbox.addWidget(self.target_preview_label)
+        sa = QScrollArea()
+        sa.setWidget(self.target_preview_label)
+        vbox.addWidget(sa)
         gbox = QGroupBox("target preview", self)
         gbox.setLayout(vbox)
         temp_box = QVBoxLayout()
@@ -330,6 +332,7 @@ class MyGUI(QWidget):
         vbox.addLayout(hbox)
         gbox = QGroupBox("parameters")
         gbox.setLayout(vbox)
+#         scroll_area.setWidget(gbox)
         temp_box = QVBoxLayout()
         temp_box.addWidget(gbox)
         return temp_box
@@ -620,6 +623,7 @@ class Optimizer(Thread):
             raise RuntimeError("Renderer dispatcher is not provided")
         self.rendis = rendis
         self.renderer = rendis.acquire()
+        renderer = self.renderer
         self._optim_method = lambda *x: None
         self._energy_list = []
         self.set_param = renderer.set_param
