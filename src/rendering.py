@@ -184,7 +184,7 @@ class Renderer(Thread):
         # windows initialization
         self.window = self._Window()        
         self.viewport_size = w, h = (640, 480)
-        self.window.width, self.window.height = (w*5/2, h)
+        self.window.width, self.window.height = (w*3/2, h*2)
         self.window.handle = glfw.create_window(self.window.width, self.window.height, "scene", None, None)
         if self.window.handle == None:
             glfw.terminate()
@@ -378,9 +378,9 @@ class Renderer(Thread):
 #         atb.init() # cannot tell what for, given by the binding author
         self.total = -233.3
         atb.TwInit(atb.TW_OPENGL, None)
-        atb.TwWindowSize(*self.viewport_size)
+        atb.TwWindowSize(self.window.width, self.window.height)
         self.extern_param_bar = atb.Bar(name="extern_param", label="evals", help="Scene atb",
-                           position=(10, 10), size=(200,300))
+                           position=(650, 10), size=(200,300))
         self.extern_param_bar.add_var("total", getter=self.get_total, precision=6)
         
         # external defined energy terms
@@ -535,7 +535,7 @@ class Renderer(Thread):
             glDrawElements(GL_TRIANGLES, len(item.model.obj.indices),
                             GL_UNSIGNED_SHORT, None)
 
-        glViewport(w, 0, w, h)
+        glViewport(0, h, w, h)
 #         glDisable(GL_CULL_FACE)
         
 #         glUseProgram(self.basic_program_handle)
@@ -592,7 +592,7 @@ class Renderer(Thread):
                             GL_UNSIGNED_SHORT, None)
         glDisable(GL_BLEND)
         
-        glViewport(w*2, 0, w/2, h/2)
+        glViewport(w, 0, w/2, h/2)
         glUseProgram(self.bg_shader.handle)
         glBindVertexArray(self.background_vao_handle)
 #         glBindVertexArray(self.floor.model.vao_handle)
@@ -661,7 +661,7 @@ class Renderer(Thread):
 #         self.param_lock.acquire()
         band_index = 0 # using red band to store a shadow
         w, h = self.viewport_size
-        img = self.snapshot.crop((w, 0, w * 2, h))
+        img = self.snapshot.crop((0, h, w, h * 2))
         img.load()
         img = img.split()[0]
         if max(img.getdata()) == 0:
