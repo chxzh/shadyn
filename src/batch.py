@@ -24,11 +24,17 @@ class Minimalistic_GUI(QWidget):
         hbox.addWidget(self.button)
         hbox.addStretch(1)
         self.setLayout(hbox)
+        self.started = False
     
     def _on_button_clicked(self):
-        self.button.setText("stop")
         if self.optimizer:
-            self.optimizer.stop()
+            if not self.started:
+                self.started = True
+                self.button.setText("stop")
+                self.optimizer.start()
+            else:            
+                self.button.setText("stopped")
+                self.optimizer.stop()
 
     def run(self):
         self.show()
@@ -72,25 +78,25 @@ def all_single_energy_combos():
         optimizer.run()
     
 def vanilla():
-    renderer = Renderer()
-    renderer.set_energy_terms(Optimizer.energy_dic.keys())
-    renderer.set_penalty_terms(['penalty'])
     from PIL import Image
-    renderer.set_target_image(Image.open("..\\img\\target_mickey.png").convert('L'))
-    renderer.start()
-    renderer.wait_till_init()
-    init_X_Y(*renderer.viewport_size)
+    target_path = "..\\img\\target_mickey.png"
+#     target_img = Image.open(target_path).convert('L')
+    penalties = [Optimizer.penalty_name]
+    energies = ["first moments (normalized)", "XOR comparison", "secondary moments (normalized)"]
+    energy_pairs = [energies, [1, 1, 1]]
+    rendis = Renderer_dispatcher()
+    rendis.start()
+    init_X_Y(640, 480)
     plotter = plotting.Plotter(*get_fname("..\\res"))
-    optimizer = Optimizer(None)
+    optimizer = Optimizer(rendis)
     plotting.attach_plotter(optimizer, plotter)
-    optimizer.set_target("..\\img\\target_mickey.png")
+    optimizer.set_target(target_path)
     optimizer.set_method("CMA")
 #     optimizer.set_energy(["first moments (normalized)"], [1])
-    optimizer.set_energy(["first moments (normalized)", "XOR comparison"], 
-                         [1,  1])
+    optimizer.set_energy(*energy_pairs)
 #     optimizer.set_energy(["XOR comparison"], [1])
-    optimizer.start()
-    
+    gui = Minimalistic_GUI(optimizer)
+    gui.run()
 
 def renderer_only():
     renderer = Renderer()
@@ -142,10 +148,8 @@ def testing_moments():
     print shadow_optim._get_fst_moments(im)
 
 def main():
-    gui = Minimalistic_GUI()
-    gui.run()
 #     single_energy()
-#     vanilla()
+    vanilla()
 #     takeoff_and_destory()
 #     dispatcher_vanilla()
 #     single_energy_combo("Powell", "XOR comparison")

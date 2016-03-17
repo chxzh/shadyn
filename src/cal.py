@@ -64,7 +64,7 @@ def get_sec_moments(image):
     m_20 = ((X_offset**2)*img).sum() / M_00 if M_00 else 0
     m_02 = (img*(Y_offset**2)).sum() / M_00 if M_00 else 0
     m_11 = (X_offset*img*Y_offset).sum() / M_00 if M_00 else 0
-    return np.array([m_20, m_11, m_02])    
+    return np.array([m_20, m_11, m_02])
     
 def get_fst_moments(image):
     # image should be a gray scale Image object
