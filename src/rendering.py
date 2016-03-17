@@ -207,11 +207,11 @@ class Renderer(Thread):
         self._items.append(self.cube)
         small_cube = self._Item(self.sphere_model)
         small_cube.scale = vec3(0.2,0.2,0.2)
-        small_cube.position = vec3(0.7, 0.,0.7)
+        small_cube.position = vec3(0.7, 0.1 ,0.7)
         self._items.append(small_cube)
         medium_cube = self._Item(self.cube_model)
         medium_cube.scale = vec3(0.4,0.4,0.4)
-        medium_cube.position = vec3(0.2, 0.5,0.7)
+        medium_cube.position = vec3(0.2, 0.5, 0.7)
 #         medium_cube.position = vec3(-0.7, 0.,0.7)
         self._items.append(medium_cube)
         self.sphere_model.load_to_buffers()
@@ -320,13 +320,13 @@ class Renderer(Thread):
         self.background_indices = range(4) # will use triangle fans
         far_end = 1 - 1e-4
         self.background_vert = [-1.,  1.,  far_end,
-                                 1.,  1.,  far_end,
+                                -1., -1.,  far_end,
                                  1., -1.,  far_end,
-                                -1., -1.,  far_end] # in clip coordinates
+                                 1.,  1.,  far_end] # in clip coordinates
         self.background_uvs = [0., 1.,
-                               1., 1.,
+                               0., 0.,
                                1., 0.,
-                               0., 0.]
+                               1., 1.]
         self.bg_shader = self._Background_shader("../shader/background.v.glsl", 
                                                  "../shader/background.f.glsl")
         self.background_vao_handle = glGenVertexArrays(1)
@@ -359,6 +359,7 @@ class Renderer(Thread):
         except AttributeError: # target image as comparison background is not set
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, 1, 1, 0,
                          GL_RED, GL_UNSIGNED_BYTE, '\xff')
+        
 #             raise RuntimeError()
         # initializing other stuff
         glEnable(GL_DEPTH_TEST)
@@ -522,7 +523,7 @@ class Renderer(Thread):
         glUniform3f(self.color_loc, 1., 1., 1.)
         glDrawElements(GL_TRIANGLES, len(self.floor.model.obj.indices),
                         GL_UNSIGNED_SHORT, None)
-        glDisable(GL_CULL_FACE)
+#         glDisable(GL_CULL_FACE)
         # draw the projected shadows8
         glUseProgram(self.shadow_program_handle)
         glUniform3f(self.shadow.color_loc, 0.0, 0.0, 0.0)  # black shadow
@@ -535,7 +536,7 @@ class Renderer(Thread):
                             GL_UNSIGNED_SHORT, None)
 
         glViewport(w, 0, w, h)
-        glDisable(GL_CULL_FACE)
+#         glDisable(GL_CULL_FACE)
         
 #         glUseProgram(self.basic_program_handle)
 #         # needs binding the floor
@@ -592,18 +593,34 @@ class Renderer(Thread):
         glDisable(GL_BLEND)
         
         glViewport(w*2, 0, w/2, h/2)
-        glDisable(GL_CULL_FACE)
-        glUseProgram(self.basic_program_handle)
-        glDrawElements(GL_TRIANGLES, len(self.floor.model.obj.indices),
-                        GL_UNSIGNED_SHORT, None)
+        glUseProgram(self.bg_shader.handle)
+        glBindVertexArray(self.background_vao_handle)
+#         glBindVertexArray(self.floor.model.vao_handle)
+        v_loc = glGetAttribLocation(self.bg_shader.handle, "coord3d")
+        glEnableVertexAttribArray(v_loc)
+        glBindBuffer(GL_ARRAY_BUFFER, self.bg_v_buffer)
+#         glBindBuffer(GL_ARRAY_BUFFER, self.floor.model.v_buffer)
+        glVertexAttribPointer(v_loc, 3, GL_FLOAT, GL_FALSE, 0, None)
+#         uv_loc = glGetAttribLocation(self.bg_shader.handle, "vertexUV")
+        uv_loc = 2
+        glEnableVertexAttribArray(uv_loc)
+        glBindBuffer(GL_ARRAY_BUFFER, self.bg_uv_buffer)
+        glVertexAttribPointer(uv_loc, 2, GL_FLOAT, GL_FALSE, 0, None)
+        bg_tex_loc = glGetUniformLocation(self.bg_shader.handle, "bg_tex")
+        glUniform1i(bg_tex_loc, 0)
+        glActiveTexture(GL_TEXTURE0)
+        glBindTexture(GL_TEXTURE_2D, self.bg_tex_handle)
+        glDrawElements(GL_TRIANGLE_FAN, len(self.background_indices), GL_UNSIGNED_SHORT, None)
+#         glUseProgram(self.basic_program_handle)
+#         glDrawElements(GL_TRIANGLES, len(self.floor.model.obj.indices),
+#                         GL_UNSIGNED_SHORT, None)
         
         glUseProgram(self.shadow_program_handle)
         glEnable(GL_CULL_FACE)
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glUniform1f(glGetUniformLocation(self.shadow.handle, "alpha"),
-                    1.)
-        glLineWidth(2)
+        glUniform1f(glGetUniformLocation(self.shadow.handle, "alpha"), 0.5)
+        glUniform1i(glGetUniformLocation(self.shadow.handle, "change_depth"), 1)
         for item in self._items:
             self.shadow.bind(item.model)
             glUniformMatrix4fv(self.shadow.MsVP_loc, 1, GL_FALSE,
@@ -614,10 +631,13 @@ class Renderer(Thread):
 #                             GL_UNSIGNED_SHORT, None)
             glUniform3f(glGetUniformLocation(self.shadow.handle, "shadowColor"),
                         *item.color)
+            glUniform1f(glGetUniformLocation(self.shadow.handle, "clip_depth"),
+                        1/(item.position.y**2 + 1.001))
     #         glUniformMatrix4fv(shadow_M_loc, 1, GL_FALSE, model_mat.toList())
     #         glUniformMatrix4fv(shadow_VP_loc, 1, GL_FALSE, VP_mat_top.toList())
             glDrawElements(GL_TRIANGLES, len(item.model.obj.indices),
                             GL_UNSIGNED_SHORT, None)
+        glUniform1i(glGetUniformLocation(self.shadow.handle, "change_depth"), 0)
         glDisable(GL_BLEND)
             
         # handling snapshot request if any
@@ -887,8 +907,6 @@ def _main():
 #     renderer.bg_img = im
     renderer.start()
     renderer.wait_till_init()
-    ss = renderer.acquire_snapshot()
-    ss.show()
 #     renderer.scene_penalty(1)
 #     from shadow_optim import MyGUI
 #     gui = MyGUI(renderer)
