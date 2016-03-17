@@ -7,6 +7,36 @@ from itertools import product
 from tools import get_fname
 from cal import *
 from astropy.units import second
+from PyQt4.QtGui import *
+import sys
+
+qt_app = QApplication(sys.argv)
+class Minimalistic_GUI(QWidget):
+    def __init__(self, optimizer=None):
+        QWidget.__init__(self)
+        self.optimizer = optimizer
+        self.setFixedSize(300,100)
+        self.setWindowTitle("control")
+        self.button = QPushButton("start")
+        self.button.clicked.connect(self._on_button_clicked)
+        hbox = QHBoxLayout()
+        hbox.addStretch(1)
+        hbox.addWidget(self.button)
+        hbox.addStretch(1)
+        self.setLayout(hbox)
+    
+    def _on_button_clicked(self):
+        self.button.setText("stop")
+        if self.optimizer:
+            self.optimizer.stop()
+
+    def run(self):
+        self.show()
+        qt_app.exec_()
+    
+    ### END OF Minimalistic_GUI
+
+
 def get_renderer():
     renderer = Renderer()
     renderer.start()
@@ -34,7 +64,7 @@ def all_single_energy_combos():
     for method_name, energy_name in product(Optimizer.method_dic, Optimizer.energy_dic):
         print method_name, energy_name
         renderer.set_param(x_0)
-        optimizer = Optimizer(renderer)
+        optimizer = Optimizer(None)
         plotting.attach_plotter(optimizer, plotting.Plotter(*get_fname("..\\res")))
         optimizer.set_target("C:\\Users\\cxz\\Pictures\\target.png")
         optimizer.set_method(method_name)
@@ -51,7 +81,7 @@ def vanilla():
     renderer.wait_till_init()
     init_X_Y(*renderer.viewport_size)
     plotter = plotting.Plotter(*get_fname("..\\res"))
-    optimizer = Optimizer(renderer)
+    optimizer = Optimizer(None)
     plotting.attach_plotter(optimizer, plotter)
     optimizer.set_target("..\\img\\target_mickey.png")
     optimizer.set_method("CMA")
@@ -59,7 +89,8 @@ def vanilla():
     optimizer.set_energy(["first moments (normalized)", "XOR comparison"], 
                          [1,  1])
 #     optimizer.set_energy(["XOR comparison"], [1])
-    optimizer.run()
+    optimizer.start()
+    
 
 def renderer_only():
     renderer = Renderer()
@@ -111,10 +142,12 @@ def testing_moments():
     print shadow_optim._get_fst_moments(im)
 
 def main():
+    gui = Minimalistic_GUI()
+    gui.run()
 #     single_energy()
 #     vanilla()
 #     takeoff_and_destory()
-    dispatcher_vanilla()
+#     dispatcher_vanilla()
 #     single_energy_combo("Powell", "XOR comparison")
 #     testing_moments()
     pass
