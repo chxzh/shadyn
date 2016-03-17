@@ -881,7 +881,7 @@ class Renderer_dispatcher(Thread):
         if self.penalty_terms:
             self.renderer.set_penalty_terms(self.penalty_terms)
         if self.target_image:
-            self.target_image.set_target_image(self.target_image)
+            self.renderer.set_target_image(self.target_image)
         self.renderer.start()
         self.renderer.wait_till_init()
         # -- need to collect the parameters

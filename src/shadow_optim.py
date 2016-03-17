@@ -23,6 +23,7 @@ from functools import wraps
 from tools import get_fname
 from cal import *
 from rendering import Renderer, Renderer_dispatcher
+from sympy.physics.units import energy
 # log.init()
 
 qt_app = QApplication(sys.argv)
@@ -32,6 +33,7 @@ class MyGUI(QWidget):
         if not rendis:
             raise RuntimeError("renderer dispatcher is not provided")
         self.rendis = rendis
+        self.rendis.register(self._on_renderer_reboot)
         self.renderer = rendis.acquire()
         init_X_Y(*self.renderer.viewport_size)
         self._init_window()
@@ -92,6 +94,7 @@ class MyGUI(QWidget):
         self.target_path_label.setText(filename)
         self.target_preview_label.setPixmap(QPixmap(filename))
         self.target_preview_label.show()
+        self.renderer = self.rendis.acquire_new(target_image=Image.open(filename))
         # TODO: deal with cases when the image is unfit
     
     def _init_target_preview(self):
@@ -161,6 +164,9 @@ class MyGUI(QWidget):
             else: # pausing, to continue
                 self.play_pause_button.setText("PAUSE")
     
+    def _on_renderer_reboot(self):
+        self.renderer = self.rendis.acquire()
+        
     def _on_stop(self):
         # TODO: find a way to stop the optimization
         if self._optimizer.stopable:
@@ -622,6 +628,7 @@ class Optimizer(Thread):
         if not rendis:
             raise RuntimeError("Renderer dispatcher is not provided")
         self.rendis = rendis
+        self.rendis.register(self._on_renderer_reboot)
         self.renderer = rendis.acquire()
         renderer = self.renderer
         self._optim_method = lambda *x: None
@@ -642,12 +649,6 @@ class Optimizer(Thread):
         self._stop_sign = False
         self.stopable = False
     
-    def _init_renderer(self, renderer=None):
-        # if renderer != None, it is starting a new one
-        if renderer != None: self.renderer = renderer
-        self.renderer.set_energy_terms(self.energy_dic.keys())
-        if renderer != None: self.renderer.start()
-        self.renderer.wait_till_init()
     
     @log.task_log
     @plotting.plot_task
@@ -661,6 +662,9 @@ class Optimizer(Thread):
             raise RuntimeError("Method unset")
         if self.renderer == None:
             raise RuntimeError("Renderer missing")
+        self.renderer = self.rendis.acquire_new(energy_terms=[n for f,n,w in self._energy_list],
+                                                penalty_terms=[self.penalty_name],
+                                                target_image=self._target_img)
         # build optimizer
         err_func = self._wrap_eval(self.energy_func)
         if self.line_search_first:
@@ -668,7 +672,6 @@ class Optimizer(Thread):
         else:
             pass
         # wrap optimizer with green_light
-#         self._init_renderer(self.renderer)
         self.result = self._optim_method(x=self.renderer.get_param(),
                            f=err_func)
         self._finished_callback(*self._finished_callback_args)
@@ -833,6 +836,9 @@ class Optimizer(Thread):
 
     def _strip_positions(self, x):
         return [tuple(x[0:3]), tuple(x[6:9]), tuple(x[12:15])]
+    
+    def _on_renderer_reboot(self):
+        self.renderer = self.rendis.acquire()
     
     # obsolete
     def _record_term(f):
