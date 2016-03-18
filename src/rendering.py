@@ -639,6 +639,8 @@ class Renderer(Thread):
                             GL_UNSIGNED_SHORT, None)
         glUniform1i(glGetUniformLocation(self.shadow.handle, "change_depth"), 0)
         glDisable(GL_BLEND)
+        
+        atb.TwDraw()
             
         # handling snapshot request if any
         if self.ss_update.locked():
@@ -649,7 +651,6 @@ class Renderer(Thread):
 #         self._save_snapshot()
 
 
-        atb.TwDraw()
         glfw.swap_buffers(self.window.handle)
         glfw.poll_events()
 
