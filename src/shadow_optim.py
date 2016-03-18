@@ -765,6 +765,8 @@ class Optimizer(Thread):
             fvals = [y for y in generate(solutions)]
             es.tell(solutions, fvals)
         res = es.result()
+        self.best_x = es.best.x
+        self.best_f = es.best.f
         return res[0], res[1]
     
     def stop(self):

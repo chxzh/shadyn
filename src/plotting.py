@@ -121,6 +121,8 @@ def plot_task(f):
             
             cls.plotter.set_method(cls._method_name) # TODO: terrible accessing
             cls.plotter.plot_result()
+            cls.renderer.set_param(cls.best_x)
+            # TODO: how to deal with atb parameters unmatch
             img = cls.renderer.acquire_snapshot()
             img.save(cls.plotter._path + "\\final_result_snapshot.png") # TODO: ehh
             img = cls.renderer.acquire_full_snapshot()
