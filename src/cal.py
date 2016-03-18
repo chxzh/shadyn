@@ -86,7 +86,7 @@ from PIL import ImageMath as imath
 def xor_closure(target):
     def _get_xor(image):
         xor_img = imath.eval("a^b", a=image, b=target)
-        return sum(xor_img.getdata()) / (640*480)
+        return sum(xor_img.getdata())/255
     return _get_xor
 
 def sq_diff_closure(func):
