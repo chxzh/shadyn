@@ -82,8 +82,12 @@ def vanilla():
     target_path = "..\\img\\target_mickey.png"
 #     target_img = Image.open(target_path).convert('L')
     penalties = [Optimizer.penalty_name]
-    energies = ["first moments (normalized)", "XOR comparison", "secondary moments (normalized)"]
-    energy_pairs = [energies, [1, 1, 1]]
+#     energies = ["first moments (normalized)", "XOR comparison", "secondary moments (normalized)"]
+#     energies = ["XOR comparison"]
+#     energies = ["first moments (normalized)"]
+    energies = ["secondary moments (normalized)"]
+#     energy_pairs = [energies, [1e-4,1,1e-4]]
+    energy_pairs = [energies, [1]]
     rendis = Renderer_dispatcher()
     rendis.start()
     init_X_Y(640, 480)

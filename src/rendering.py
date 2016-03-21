@@ -2,7 +2,7 @@ import glfw
 import tools
 from OpenGL.GL import *
 from app import *
-from ctypes import c_uint8, c_float, c_ushort, c_void_p
+from ctypes import c_uint8, c_float, c_ushort, c_void_p, c_double
 from math import pi, cos, sin
 from cgkit.cgtypes import *
 from PIL import Image
@@ -381,8 +381,13 @@ class Renderer(Thread):
         atb.TwWindowSize(self.window.width, self.window.height)
         self.extern_param_bar = atb.Bar(name="extern_param", label="evals", help="Scene atb",
                            position=(650, 10), size=(200,300))
-        self.extern_param_bar.add_var("total", getter=self.get_total, precision=6)
+        self.extern_param_bar.add_var("total", getter=self.get_total,
+                                      setter=self.set_total, precision=6)
         
+        value = c_float()
+        self.extern_param_bar.add_var("foo", value, readonly=False)
+#         atb.TwAddVarRW(self.extern_param_bar, "foo", ctypes.byref(value), atb.TW_TYPE_DOUBLE,
+#                         " label='Rot speed' min=0 max=2 step=0.01 keyIncr=s keyDecr=S help='Rotation speed (turns/second)' ")
         # external defined energy terms
         self.extern_param_bar.add_separator("")
         for i, name in enumerate(self._energy_terms):
@@ -400,8 +405,27 @@ class Renderer(Thread):
         for i, name in enumerate(self._intern_penalty_terms):
             self.extern_param_bar.add_var(name="intern_penalty_%d" % i, label=name,
                     getter=self._disp_getter_closure(self._intern_penalty_terms, name))
-         
+        
         atb.TwDefine("extern_param refresh=0.1")
+        __dll__ = ctypes.CDLL("AntTweakBar64.dll")
+        def mouse_button_callback(window, button, action, mods):
+            tAction = tButton = None
+            if action == glfw.RELEASE:
+                tAction = atb.TW_MOUSE_RELEASED
+            elif action == glfw.PRESS:
+                tAction = atb.TW_MOUSE_PRESSED
+            if button == glfw.MOUSE_BUTTON_LEFT:
+                tButton = atb.TW_MOUSE_LEFT
+            elif button == glfw.MOUSE_BUTTON_RIGHT:
+                tButton = atb.TW_MOUSE_RIGHT
+            elif button == glfw.MOUSE_BUTTON_MIDDLE:
+                tButton = atb.TW_MOUSE_MIDDLE
+            if tAction and tButton:
+                atb.TwMouseButton(tAction, tButton)            
+#         glfw.set_mouse_button_callback(self.window.handle, __dll__.TwEventMouseButtonGLFW)
+        glfw.set_mouse_button_callback(self.window.handle, mouse_button_callback)
+        cursor_call_back = lambda w, x, y: atb.TwMouseMotion(int(x),int(y))
+        glfw.set_cursor_pos_callback(self.window.handle, cursor_call_back)
         pass
     
     def get_total(self):

@@ -86,7 +86,7 @@ class Renderer(Thread):
 
 if __name__ == "__main__":
     renderer = Renderer()
-    optimizer = Optimizer(renderer)
+    optimizer = Optimizer(None)
     renderer.start()
     optimizer.start()
     
