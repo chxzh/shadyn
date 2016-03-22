@@ -380,14 +380,8 @@ class Renderer(Thread):
         atb.TwInit(atb.TW_OPENGL, None)
         atb.TwWindowSize(self.window.width, self.window.height)
         self.extern_param_bar = atb.Bar(name="extern_param", label="evals", help="Scene atb",
-                           position=(650, 10), size=(200,300))
-        self.extern_param_bar.add_var("total", getter=self.get_total,
-                                      setter=self.set_total, precision=6)
-        
-        value = c_float()
-        self.extern_param_bar.add_var("foo", value, readonly=False)
-#         atb.TwAddVarRW(self.extern_param_bar, "foo", ctypes.byref(value), atb.TW_TYPE_DOUBLE,
-#                         " label='Rot speed' min=0 max=2 step=0.01 keyIncr=s keyDecr=S help='Rotation speed (turns/second)' ")
+                           position=(650, 10), size=(300,300), valueswidth=150)
+        self.extern_param_bar.add_var("total", getter=self.get_total)
         # external defined energy terms
         self.extern_param_bar.add_separator("")
         for i, name in enumerate(self._energy_terms):
@@ -406,10 +400,45 @@ class Renderer(Thread):
             self.extern_param_bar.add_var(name="intern_penalty_%d" % i, label=name,
                     getter=self._disp_getter_closure(self._intern_penalty_terms, name))
         
+        self.control_bar = atb.Bar(name="controls", label="controls",
+                                   position=(650, 320), size=(300, 300), valueswidth=150)
+        def position_getter_closure(item, index):
+            def getter():
+                return item.position[index]
+            return getter   
+        def position_setter_closure(item, index):
+            def setter(x):
+                item.position[index] = x
+            return setter        
+        def rotation_getter_closure(item, index):
+            def getter():
+                return item.orientation[index]
+            return getter   
+        def rotation_setter_closure(item, index):
+            def setter(x):
+                item.orientation[index] = x
+            return setter
+        for i, item in enumerate(self._items):
+            group = "item_%d" % i
+            for j, n in enumerate('xyz'):
+                name = "%s %s" % (group, n)
+                self.control_bar.add_var(name=name, label=n, readonly=False, 
+                                         vtype=atb.TW_TYPE_FLOAT, step=0.05,
+                                         group=group,
+                                         getter=position_getter_closure(item, j), 
+                                         setter=position_setter_closure(item, j))
+            for j, n in enumerate('abc'):
+                name = "%s %s" % (group, n)
+                self.control_bar.add_var(name=name, label=n, readonly=False, 
+                                         vtype=atb.TW_TYPE_FLOAT, step=0.05,
+                                         group=group,
+                                         getter=rotation_getter_closure(item, j), 
+                                         setter=rotation_setter_closure(item, j))
+            self.control_bar.define("opened=false",group)
+        
         atb.TwDefine("extern_param refresh=0.1")
-        __dll__ = ctypes.CDLL("AntTweakBar64.dll")
         def mouse_button_callback(window, button, action, mods):
-            tAction = tButton = None
+            tAction = tButton = -1
             if action == glfw.RELEASE:
                 tAction = atb.TW_MOUSE_RELEASED
             elif action == glfw.PRESS:
@@ -420,12 +449,10 @@ class Renderer(Thread):
                 tButton = atb.TW_MOUSE_RIGHT
             elif button == glfw.MOUSE_BUTTON_MIDDLE:
                 tButton = atb.TW_MOUSE_MIDDLE
-            if tAction and tButton:
-                atb.TwMouseButton(tAction, tButton)            
-#         glfw.set_mouse_button_callback(self.window.handle, __dll__.TwEventMouseButtonGLFW)
+            if not (tAction == -1 or tButton == -1): atb.TwMouseButton(tAction, tButton)            
         glfw.set_mouse_button_callback(self.window.handle, mouse_button_callback)
-        cursor_call_back = lambda w, x, y: atb.TwMouseMotion(int(x),int(y))
-        glfw.set_cursor_pos_callback(self.window.handle, cursor_call_back)
+        cursor_callback = lambda w, x, y: atb.TwMouseMotion(int(x),int(y))
+        glfw.set_cursor_pos_callback(self.window.handle, cursor_callback)
         pass
     
     def get_total(self):
