@@ -9,6 +9,7 @@ from cal import *
 from astropy.units import second
 from PyQt4.QtGui import *
 import sys
+from PIL import ImageMath
 
 qt_app = QApplication(sys.argv)
 class Minimalistic_GUI(QWidget):
@@ -17,23 +18,37 @@ class Minimalistic_GUI(QWidget):
         self.optimizer = optimizer
         self.setFixedSize(300,100)
         self.setWindowTitle("control")
-        self.button = QPushButton("start")
-        self.button.clicked.connect(self._on_button_clicked)
+        self.start_button = QPushButton("start")
+        self.start_button.clicked.connect(self._on_start_clicked)
+        self.snapshot_button = QPushButton("snapshot")
+        self.snapshot_button.clicked.connect(self._on_snapshot_clicked)
         hbox = QHBoxLayout()
         hbox.addStretch(1)
-        hbox.addWidget(self.button)
+        hbox.addWidget(self.start_button)
+        hbox.addWidget(self.snapshot_button)
         hbox.addStretch(1)
         self.setLayout(hbox)
         self.started = False
     
-    def _on_button_clicked(self):
+    def _on_snapshot_clicked(self):
+        img = self.optimizer.rendis.acquire().acquire_snapshot()
+        filename = QFileDialog.getSaveFileName(self,
+                                    "save the binary shadow snapshot",
+                                    "../img/",
+                                    "image file (*.png)")
+        if filename != '':
+            img = ImageMath.eval("a/127 * 255", a=img)
+            img.save(str(filename), format='png')
+        pass
+    
+    def _on_start_clicked(self):
         if self.optimizer:
             if not self.started:
                 self.started = True
-                self.button.setText("stop")
+                self.start_button.setText("stop")
                 self.optimizer.start()
             else:            
-                self.button.setText("stopped")
+                self.start_button.setText("stopped")
                 self.optimizer.stop()
 
     def run(self):
@@ -79,16 +94,18 @@ def all_single_energy_combos():
     
 def vanilla():
     from PIL import Image
+    target_path = "..\\img\\almost_unmoved.png"
     target_path = "..\\img\\target_mickey.png"
 #     target_img = Image.open(target_path).convert('L')
     penalties = [Optimizer.penalty_name]
 #     energies = ["first moments (normalized)", "XOR comparison", "secondary moments (normalized)"]
-#     energies = ["XOR comparison"]
+    energies = ["XOR comparison"]
 #     energies = ["first moments (normalized)"]
-    energies = ["secondary moments (normalized)"]
+#     energies = ["secondary moments (normalized)"]
 #     energy_pairs = [energies, [1e-4,1,1e-4]]
     energy_pairs = [energies, [1]]
     rendis = Renderer_dispatcher()
+    rendis.target_image = Image.open(target_path)
     rendis.start()
     init_X_Y(640, 480)
     plotter = plotting.Plotter(*get_fname("..\\res"))
@@ -143,6 +160,9 @@ def dispatcher_vanilla():
     client.start()
     dispatcher.run()
     
+def testing_gui():
+    gui = Minimalistic_GUI()
+    gui.run()
     
 def testing_moments():
     from PIL import Image
@@ -154,6 +174,7 @@ def testing_moments():
 def main():
 #     single_energy()
     vanilla()
+#     testing_gui()
 #     takeoff_and_destory()
 #     dispatcher_vanilla()
 #     single_energy_combo("Powell", "XOR comparison")

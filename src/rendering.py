@@ -202,18 +202,22 @@ class Renderer(Thread):
         self.cube_model = self._Model(Object("../obj/cube.obj"))
         self.sphere_model = self._Model(Object("../obj/sphere/sphere.obj"))
 #         self.cube.obj = Object("../obj/cube.obj")
-        self.cube = self._Item(self.cube_model)
-        self.cube.scale = vec3(0.6, 0.6, 0.6)
-        self._items.append(self.cube)
-        small_cube = self._Item(self.sphere_model)
-        small_cube.scale = vec3(0.2,0.2,0.2)
-        small_cube.position = vec3(0.7, 0.1 ,0.7)
-        self._items.append(small_cube)
-        medium_cube = self._Item(self.cube_model)
-        medium_cube.scale = vec3(0.4,0.4,0.4)
-        medium_cube.position = vec3(0.2, 0.5, 0.7)
-#         medium_cube.position = vec3(-0.7, 0.,0.7)
-        self._items.append(medium_cube)
+#         self.cube = self._Item(self.cube_model)
+#         self.cube.scale = vec3(0.6, 0.6, 0.6)
+#         self._items.append(self.cube)
+#         small_cube = self._Item(self.sphere_model)
+#         small_cube.scale = vec3(0.2,0.2,0.2)
+#         small_cube.position = vec3(0.7, 0.1 ,0.7)
+#         self._items.append(small_cube)
+#         medium_cube = self._Item(self.cube_model)
+#         medium_cube.scale = vec3(0.4,0.4,0.4)
+#         medium_cube.position = vec3(0.2, 0.5, 0.7)
+# #         medium_cube.position = vec3(-0.7, 0.,0.7)
+#         self._items.append(medium_cube)
+        for i in xrange(20):
+            sphere = self._Item(self.cube_model)
+            sphere.scale = vec3(0.1, 0.1, 0.1)
+            self._items.append(sphere)
         self.sphere_model.load_to_buffers()
         self.cube_model.load_to_buffers()
         # bind buffers
@@ -374,6 +378,9 @@ class Renderer(Thread):
         self.init_atb()
         self._init_target_image
     
+    def disable_atb_controls(self):
+        self.atb_controls = False
+    
     def init_atb(self):
 #         atb.init() # cannot tell what for, given by the binding author
         self.total = -233.3
@@ -399,7 +406,9 @@ class Renderer(Thread):
         for i, name in enumerate(self._intern_penalty_terms):
             self.extern_param_bar.add_var(name="intern_penalty_%d" % i, label=name,
                     getter=self._disp_getter_closure(self._intern_penalty_terms, name))
+        atb.TwDefine("extern_param refresh=0.1")
         
+        if not self.atb_controls: return
         self.control_bar = atb.Bar(name="controls", label="controls",
                                    position=(650, 320), size=(300, 300), valueswidth=150)
         def position_getter_closure(item, index):
@@ -436,7 +445,6 @@ class Renderer(Thread):
                                          setter=rotation_setter_closure(item, j))
             self.control_bar.define("opened=false",group)
         
-        atb.TwDefine("extern_param refresh=0.1")
         def mouse_button_callback(window, button, action, mods):
             tAction = tButton = -1
             if action == glfw.RELEASE:
@@ -453,7 +461,27 @@ class Renderer(Thread):
         glfw.set_mouse_button_callback(self.window.handle, mouse_button_callback)
         cursor_callback = lambda w, x, y: atb.TwMouseMotion(int(x),int(y))
         glfw.set_cursor_pos_callback(self.window.handle, cursor_callback)
-        pass
+#         __dll__ = ctypes.CDLL("AntTweakBar64.dll")
+#         def key_pressed_callback(window, key, scancode, action, mods):
+#             tKey = tMod = -1
+#             if key == glfw.KEY_BACKSPACE:
+#                 tKey = '\b' # still not working
+#             elif key == glfw.KEY_ENTER:
+#                 tKey = '\r' # still not working
+#             else:
+#                 tKey = key
+#             if mods == glfw.MOD_ALT:
+#                 tMod = atb.TW_KMOD_ALT
+#             elif mods == glfw.MOD_CONTROL:
+#                 tMod = atb.TW_KMOD_CTRL
+#             elif mods == glfw.MOD_SHIFT:
+#                 tMod = atb.TW_KMOD_SHIFT
+#             else:
+#                 tMod = atb.TW_KMOD_NONE                
+#             if not (tKey == -1 or tMod == -1):
+#                 atb.TwKeyPressed(tKey, tMod)            
+#         pass
+#         glfw.set_key_callback(self.window.handle, key_pressed_callback)
     
     def get_total(self):
         return self.total
@@ -532,6 +560,7 @@ class Renderer(Thread):
         self._extern_penalty_terms = {}
         self._intern_penalty_terms = {"shadow_distance": -23.3, 'x': -23.3, 'y': -23.3}
         self.bg_img = None
+        self.atb_controls = True
     
     def stop(self):
         self._cont_flag = False
@@ -565,6 +594,7 @@ class Renderer(Thread):
             glUniform3f(self.color_loc, *item.color)
             glDrawElements(GL_TRIANGLES, len(item.model.obj.indices),
                             GL_UNSIGNED_SHORT, None);
+        self.standard_shader.bind(self.floor.model)
         MVint = (self.cam_obs.view_mat * self.floor.model_mat()).inverse()
         glUniformMatrix4fv(self.MVint_loc, 1, GL_TRUE, MVint.toList())
         M = self.floor.model_mat()
@@ -749,13 +779,9 @@ class Renderer(Thread):
     def set_param(self, x):
         self.param_lock.acquire()
         for i, item in enumerate(self._items):
-            i *= 6
-            item.position = vec3(x[i: i + 3])
-            item.orientation = vec3(x[i + 3: i + 6])
-#         big_cube = self._items[0]
-#         big_cube.position = vec3(x[0:3])
-#         big_cube.orientation = vec3(x[3:6])
-        
+            j = i * 6
+            item.position = vec3(x[j: j+3])
+            item.orientation = vec3(x[j+3: j+6])
         self.param_lock.release()
         return
     
@@ -771,6 +797,7 @@ class Renderer(Thread):
         for item in self._items:
             params.append(item.position)
             params.append(item.orientation)
+#             params.append(item.orientation)
         return np.concatenate(params)
 
     def to_close():
@@ -858,6 +885,7 @@ class Renderer_dispatcher(Thread):
         self.energy_terms = None
         self.penalty_terms = None
         self.target_image = None
+        self.atb_controls = True
         pass
     
     def stop(self):
@@ -884,13 +912,14 @@ class Renderer_dispatcher(Thread):
             self.response.release()
         return
     
-    def acquire_new(self, energy_terms=None, penalty_terms=None, target_image=None):
+    def acquire_new(self, energy_terms=None, penalty_terms=None, target_image=None, atb_controls=True):
         # note that the parameters will be overwritten by the later request if the
         #rebooting process is not finished, ending at having one with different parameter
         #than requested. This is terrible but I cannot figure any better way.
         if energy_terms: self.energy_terms = energy_terms
         if penalty_terms: self.penalty_terms = penalty_terms
         if target_image: self.target_image = target_image
+        self.atb_controls = atb_controls
         self.requests.release() # posting a reboot request
         self.response.acquire() # wait until the request has been responded
         return self.renderer # at this point renderer shall have been rebooted
@@ -934,6 +963,8 @@ class Renderer_dispatcher(Thread):
             self.renderer.set_penalty_terms(self.penalty_terms)
         if self.target_image:
             self.renderer.set_target_image(self.target_image)
+        if not self.atb_controls:
+            self.renderer.disable_atb_controls()
         self.renderer.start()
         self.renderer.wait_till_init()
         # -- need to collect the parameters

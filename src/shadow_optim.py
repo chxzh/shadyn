@@ -662,9 +662,15 @@ class Optimizer(Thread):
             raise RuntimeError("Method unset")
         if self.renderer == None:
             raise RuntimeError("Renderer missing")
+        x = self.rendis.acquire().get_param()
         self.renderer = self.rendis.acquire_new(energy_terms=[n for f,n,w in self._energy_list],
                                                 penalty_terms=[self.penalty_name],
-                                                target_image=self._target_img)
+                                                target_image=self._target_img,
+                                                atb_controls=False)
+                                   
+        print "after reboot"             
+        self.renderer.set_param(x)
+        print "after setting x"
         # build optimizer
         err_func = self._wrap_eval(self.energy_func)
         if self.line_search_first:
@@ -672,7 +678,7 @@ class Optimizer(Thread):
         else:
             pass
         # wrap optimizer with green_light
-        self.result = self._optim_method(x=self.renderer.get_param(),
+        self.result = self._optim_method(x=x,
                            f=err_func)
         self._finished_callback(*self._finished_callback_args)
         print "finished!"
