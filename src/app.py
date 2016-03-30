@@ -74,21 +74,18 @@ class Scene:
 
 class Camera:
     def __init__(self,
-                 position=vec3(0.),
-                 orientation=vec3(0., 0., -1.),
-                 up=vec3(0.,1.,0.),
+                 position=None,
+                 orientation=None,
+                 up=None,
                  projection_matrix=None,
-                 lowleft=vec3(0,0),
-                 resolution=vec3(640,480)):
-        self.position = position
-        self.orientation = orientation.normalize()
-        self.up = up
-        self.view_mat = self.look_at(position, position + orientation, up)
-        self.projection_matrix = projection_matrix\
-            if not projection_matrix == None\
-            else mat4.perspective(math.radians(45),4./3,0.1,100)
-        self.lowleft = lowleft
-        self.resolution = resolution
+                 resolution=None):
+        self.position = position if position else vec3(0,0,0)
+        self.orientation = orientation.normalize() if orientation and orientation.length() else vec3(0., 0., -1.)
+        self.up = up if up and up.length() else vec3(0.,1.,0.)
+        self.view_mat = self.look_at(self.position, self.position + self.orientation, self.up)
+        self.resolution = resolution if resolution else (640,480)
+        self.projection_matrix = projection_matrix if projection_matrix\
+            else mat4.perspective(math.radians(45),float(self.resolution[0])/self.resolution[1],0.1,100)
         pass
     
     def look_at(self, position, target, up):
@@ -98,9 +95,9 @@ class Camera:
         self.orientation = (target - position).normalize()
         self.up = up
         # this look-at method has 3 bugs but still usable by fitting it like this
-        self.view_mat = LookAt(self.position,
+        self.view_mat = mat4.lookAt(self.position,
                               self.position*2 - target,
-                              self.up).inverse 
+                              self.up).inverse()
         return self.view_mat
     
     def on_resize(self):
@@ -108,15 +105,28 @@ class Camera:
     
 class Camera_fps(Camera):
     def __init__(self,
-                 position=vec3(0),
+                 position=None,
                  spin=0,
                  tilt=0,                 
                  projection_matrix=None,
-                 lowleft=vec3(0,0),
-                 resolution=vec3(640,480)):
+                 resolution=None):
         # default spin 0 means facing -z, spin positively counter-clockwise
         self.spin = spin
         self.tilt = tilt
+        self.position = position if position else vec3(0,0,0)
+        self._update_orientation()
+        self._update_view_mat()
+        self.speed = 0.05
+        self.rev = math.pi / 32
+#         Camera.__init__(self,
+#                         position,
+#                         orientation,
+#                         up,
+#                         projection_matrix, 
+#                         resolution)
+        return
+    
+    def _update_orientation(self):
         hori_orientation = vec3(-sin(self.spin),0,-cos(self.spin))
         if abs(self.tilt) != pi/2:
             up = vec3(0,1,0)
@@ -127,19 +137,61 @@ class Camera_fps(Camera):
         else:
             up = -hori_orientation
             orientation = vec3(0,1,0) if self.tilt > 0 else vec3(0,-1,0)
-        Camera.__init__(self,
-                        position,
-                        orientation,
-                        up,
-                        projection_matrix, 
-                        lowleft,
-                        resolution)
-    
+        self.orientation=orientation.normalize()
+        self.up = up
+        self.right = self.orientation.cross(self.up).normalize()
+        self.top = self.right.cross(self.orientation)
+        pass
+        
+    def look_at(self, position, target):
+        self.position = position
+        self.orientation = (target - position).normalize()
+        self.view_mat = mat4.lookAt(self.position,
+                              self.position*2 - target,
+                              self.up).inverse()
+        self.tilt = math.asin(self.orientation.y)
+        self.spin = math.atan2(-self.orientation.x, -self.orientation.z)
+        self.tilt_max = math.pi * 3 / 8
+        return
+
     def rotate(self, spin, tilt):
         pass
     
     def translate(self, march, sidle, dive):
         pass
+    
+    def _update_view_mat(self):
+        res = mat4.translation(-self.position)
+        res = mat4.rotation(-self.spin, vec3(0, 1, 0)) * res
+        res = mat4.rotation(-self.tilt, vec3(1, 0, 0)) * res
+        self.view_mat = res
+        return
+    
+    def keyboard_callback(self, window, key, scancode, action, mods):
+        if action == glfw.PRESS or action == glfw.REPEAT:
+            print "key: %d, scancode: %d, action: %d, mods: %d" % (key, scancode, action, mods)
+            if key == glfw.KEY_W:
+                self.position += self.speed * self.orientation
+            elif key == glfw.KEY_S:
+                self.position -= self.speed * self.orientation
+            elif key == glfw.KEY_SPACE:
+                self.position += self.speed * self.top
+            elif key == glfw.KEY_V:
+                self.position -= self.speed * self.top
+            elif key == glfw.KEY_D:
+                self.position += self.speed * self.right
+            elif key == glfw.KEY_A:
+                self.position -= self.speed * self.right
+            elif key == glfw.KEY_LEFT:
+                self.spin += self.rev
+            elif key == glfw.KEY_RIGHT:
+                self.spin -= self.rev
+            elif key == glfw.KEY_UP:
+                self.tilt = min(self.tilt + self.rev, self.tilt_max)
+            elif key == glfw.KEY_DOWN:
+                self.tilt = max(self.tilt - self.rev, -self.tilt_max)
+            self._update_orientation()
+            self._update_view_mat()
 
 class Item:
     def __init__(self, obj, 

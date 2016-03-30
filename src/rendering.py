@@ -214,8 +214,8 @@ class Renderer(Thread):
 #         medium_cube.position = vec3(0.2, 0.5, 0.7)
 # #         medium_cube.position = vec3(-0.7, 0.,0.7)
 #         self._items.append(medium_cube)
-        for i in xrange(20):
-            sphere = self._Item(self.cube_model)
+        for i in xrange(15):
+            sphere = self._Item(self.sphere_model)
             sphere.scale = vec3(0.1, 0.1, 0.1)
             self._items.append(sphere)
         self.sphere_model.load_to_buffers()
@@ -263,10 +263,13 @@ class Renderer(Thread):
 #         self.cube.model_mat.scale(vec3(0.5))
 
         # camera initializing
-        self.cam_obs = self._Camera()  # the camera for human observation
-        self.cam_obs.view_mat = self.look_at(vec3(-1, 2, 5),
-                                   vec3(0, 0, 0),
-                                   vec3(0, 1, 0))
+#         self.cam_obs = self._Camera()  # the camera for human observation
+        self.cam_obs = Camera_fps() # the camera for human observation
+        glfw.set_key_callback(self.window.handle, self.cam_obs.keyboard_callback)
+#         self.cam_obs.view_mat = self.look_at(vec3(-1, 2, 5),
+#                                    vec3(0, 0, 0),
+#                                    vec3(0, 1, 0))
+        self.cam_obs.look_at(vec3(-1,2,5), vec3(0,0,0))
         self.cam_cap = self._Camera()  # the camera to capture shadow
         self.cam_cap.view_mat = self.look_at(vec3(0, 4, 0),
                                    vec3(0, 0, 0),
@@ -580,9 +583,11 @@ class Renderer(Thread):
         # draw the scene
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glEnable(GL_CULL_FACE)
+        # draw the observation viewport
         glViewport(0, 0, w, h)
         glUseProgram(self.program_handle)
         glUniform3f(self.light_pos_loc, *self.light_pos)
+        # draw all casters
         for item in self._items:
             self.standard_shader.bind(item.model)
             model_view_inv = (self.cam_obs.view_mat * item.model_mat()).inverse()
@@ -593,8 +598,12 @@ class Renderer(Thread):
             glUniformMatrix4fv(self.MVP_loc, 1, GL_FALSE, MVP.toList())
             glUniform3f(self.color_loc, *item.color)
             glDrawElements(GL_TRIANGLES, len(item.model.obj.indices),
-                            GL_UNSIGNED_SHORT, None);
-        self.standard_shader.bind(self.floor.model)
+                            GL_UNSIGNED_SHORT, None)
+        # draw the receiver - the floor                            
+        self.standard_shader.bind(self.floor.model)     
+        glDisable(GL_CULL_FACE)  
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         MVint = (self.cam_obs.view_mat * self.floor.model_mat()).inverse()
         glUniformMatrix4fv(self.MVint_loc, 1, GL_TRUE, MVint.toList())
         M = self.floor.model_mat()
@@ -604,18 +613,20 @@ class Renderer(Thread):
         glUniform3f(self.color_loc, 1., 1., 1.)
         glDrawElements(GL_TRIANGLES, len(self.floor.model.obj.indices),
                         GL_UNSIGNED_SHORT, None)
-#         glDisable(GL_CULL_FACE)
-        # draw the projected shadows8
+        glDisable(GL_BLEND)
+        glEnable(GL_CULL_FACE)
+        # draw the projected shadows
         glUseProgram(self.shadow_program_handle)
         glUniform3f(self.shadow.color_loc, 0.0, 0.0, 0.0)  # black shadow
 #         glUniform1f(self.shadow.alpha_loc, 0.5)
         for item in self._items:
             self.shadow.bind(item.model)
             glUniformMatrix4fv(self.shadow.MsVP_loc, 1, GL_FALSE,
-                   (self.shadow.VP_mat * self.shadow.shaject_mat * item.model_mat()).toList())
+                   (self.cam_obs.proj_mat * self.cam_obs.view_mat * self.shadow.shaject_mat * item.model_mat()).toList())
             glDrawElements(GL_TRIANGLES, len(item.model.obj.indices),
                             GL_UNSIGNED_SHORT, None)
 
+        # draw the capturing viewport
         glViewport(0, h, w, h)
 #         glDisable(GL_CULL_FACE)
         
@@ -777,11 +788,13 @@ class Renderer(Thread):
         self.snapshot = img
     
     def set_param(self, x):
-        self.param_lock.acquire()
+        self.param_lock.acquire()        
         for i, item in enumerate(self._items):
             j = i * 6
             item.position = vec3(x[j: j+3])
             item.orientation = vec3(x[j+3: j+6])
+#             radius = abs(x[j+6])
+#             item.scale = vec3(radius, radius, radius)
         self.param_lock.release()
         return
     
@@ -797,6 +810,7 @@ class Renderer(Thread):
         for item in self._items:
             params.append(item.position)
             params.append(item.orientation)
+#             params.append([item.scale[0]])
 #             params.append(item.orientation)
         return np.concatenate(params)
 
