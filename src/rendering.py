@@ -191,6 +191,7 @@ class Renderer(Thread):
             raise RuntimeError("GLFW cannot create a window.")
         glfw.set_window_pos(self.window.handle, 9, 36)
         glfw.make_context_current(self.window.handle)
+        glfw.set_input_mode(self.window.handle, glfw.STICKY_KEYS, 1)
         glClearColor(0.0, 0.0, 0.2, 1.0)
 
         # default blinn-phong shader loading
@@ -265,7 +266,7 @@ class Renderer(Thread):
         # camera initializing
 #         self.cam_obs = self._Camera()  # the camera for human observation
         self.cam_obs = Camera_fps() # the camera for human observation
-        glfw.set_key_callback(self.window.handle, self.cam_obs.keyboard_callback)
+        self.cam_obs.bind_input(self.window.handle)
 #         self.cam_obs.view_mat = self.look_at(vec3(-1, 2, 5),
 #                                    vec3(0, 0, 0),
 #                                    vec3(0, 1, 0))

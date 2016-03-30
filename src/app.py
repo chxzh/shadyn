@@ -133,7 +133,9 @@ class Camera_fps(Camera):
             if abs(self.tilt) < pi/4:
                 orientation = hori_orientation + vec3(0, tan(self.tilt), 0)
             else:
+                tantilt = tan(self.tilt)
                 orientation = hori_orientation / tan(self.tilt) + vec3(0,1,0)
+                if tantilt < 0: orientation = - orientation 
         else:
             up = -hori_orientation
             orientation = vec3(0,1,0) if self.tilt > 0 else vec3(0,-1,0)
@@ -167,9 +169,14 @@ class Camera_fps(Camera):
         self.view_mat = res
         return
     
+    def bind_input(self, window):
+        glfw.set_key_callback(window, self.keyboard_callback)
+        glfw.set_cursor_pos_callback(window, self.cursor_position_callback)
+        
+    
     def keyboard_callback(self, window, key, scancode, action, mods):
         if action == glfw.PRESS or action == glfw.REPEAT:
-            print "key: %d, scancode: %d, action: %d, mods: %d" % (key, scancode, action, mods)
+#             print "key: %d, scancode: %d, action: %d, mods: %d" % (key, scancode, action, mods)
             if key == glfw.KEY_W:
                 self.position += self.speed * self.orientation
             elif key == glfw.KEY_S:
@@ -190,8 +197,13 @@ class Camera_fps(Camera):
                 self.tilt = min(self.tilt + self.rev, self.tilt_max)
             elif key == glfw.KEY_DOWN:
                 self.tilt = max(self.tilt - self.rev, -self.tilt_max)
+            else: 
+                return
             self._update_orientation()
             self._update_view_mat()
+    
+    def cursor_position_callback(self, window, xpos, ypos):
+        print xpos, ypos
 
 class Item:
     def __init__(self, obj, 
