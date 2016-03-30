@@ -295,7 +295,7 @@ class Renderer(Thread):
 
         # init the floor
         self.floor = self._Item(self.cube_model)
-        self.floor.position = vec3((0, -0.51, 0))
+        self.floor.position = vec3((0, -0.501, 0))
         self.floor.scale = vec3(5, 0.1, 5)
 #         self.floor.model_mat = mat4.translation((0, -0.51, 0)) * mat4.scaling((5, 0.1, 5))
 #         self.floor.MVP = self.cam_obs.proj_mat * self.cam_obs.view_mat * self.floor.model_mat
