@@ -8,7 +8,7 @@ in vec3 EyeDirection_cameraspace;
 in vec3 LightDirection_cameraspace;
 
 // Ouput data
-out vec3 color;
+//out vec3 color;
 
 // Values that stay constant for the whole mesh.
 //uniform sampler2D myTextureSampler;
@@ -22,6 +22,7 @@ void main(){
 	// You probably want to put them as uniforms
 	vec3 LightColor = vec3(1,1,1);
 	float LightPower = 50.0f;
+	vec3 color;
 	
 	// Material properties
 	//vec3 MaterialDiffuseColor = vec3(0.5,0.5,0.5);
@@ -59,5 +60,5 @@ void main(){
 		MaterialDiffuseColor * LightColor * LightPower * cosTheta / (distance*distance) +
 		// Specular : reflective highlight, like a mirror
 		MaterialSpecularColor * LightColor * LightPower * pow(cosAlpha,5) / (distance*distance);
-
+    gl_FragColor = vec4(color, 0.6);
 }
