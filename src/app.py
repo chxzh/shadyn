@@ -116,8 +116,8 @@ class Camera_fps(Camera):
         self.position = position if position else vec3(0,0,0)
         self._update_orientation()
         self._update_view_mat()
-        self.speed = 0.05
-        self.rev = math.pi / 32
+        self.speed = 1
+        self.rev = math.pi / 16
 #         Camera.__init__(self,
 #                         position,
 #                         orientation,
@@ -125,6 +125,11 @@ class Camera_fps(Camera):
 #                         projection_matrix, 
 #                         resolution)
         return
+    
+    def init_input(self, window):
+        self.last_mx, self.last_my = glfw.get_cursor_pos(window)
+        self.last_time = glfw.get_time()
+        self.activate_mouse = False
     
     def _update_orientation(self):
         hori_orientation = vec3(-sin(self.spin),0,-cos(self.spin))
@@ -157,10 +162,16 @@ class Camera_fps(Camera):
         return
 
     def rotate(self, spin, tilt):
+        self.spin += spin
+        self.tilt += tilt
+        self.tilt = max(self.tilt, -self.tilt_max)
+        self.tilt = min(self.tilt, self.tilt_max)
         pass
     
     def translate(self, march, sidle, dive):
-        pass
+        self.position += (march * self.orientation +
+                          sidle * self.right +
+                          dive * self.top)
     
     def _update_view_mat(self):
         res = mat4.translation(-self.position)
@@ -170,9 +181,54 @@ class Camera_fps(Camera):
         return
     
     def bind_input(self, window):
-        glfw.set_key_callback(window, self.keyboard_callback)
-        glfw.set_cursor_pos_callback(window, self.cursor_position_callback)
-        
+#         glfw.set_key_callback(window, self.keyboard_callback)
+#         glfw.set_cursor_pos_callback(window, self.cursor_position_callback)
+        pass
+    
+    def _move_step(self, window, key_p, key_n, del_time):
+        if glfw.get_key(window, key_p) == glfw.PRESS:            
+            return self.speed * del_time
+        elif glfw.get_key(window, key_n) == glfw.PRESS:       
+            return - self.speed * del_time
+            
+    
+    def poll_event(self, window):
+        flag = False
+        cur_time = glfw.get_time()
+        del_time = cur_time - self.last_time
+        march = sidle = dive = 0.
+        if glfw.get_key(window, glfw.KEY_W) == glfw.PRESS:            
+            march = self.speed * del_time
+        elif glfw.get_key(window, glfw.KEY_S) == glfw.PRESS:            
+            march = - self.speed * del_time
+        if glfw.get_key(window, glfw.KEY_D) == glfw.PRESS:            
+            sidle = self.speed * del_time
+        elif glfw.get_key(window, glfw.KEY_A) == glfw.PRESS:            
+            sidle = - self.speed * del_time
+        if glfw.get_key(window, glfw.KEY_SPACE) == glfw.PRESS:            
+            dive = self.speed * del_time
+        elif glfw.get_key(window, glfw.KEY_V) == glfw.PRESS:            
+            dive = - self.speed * del_time
+        if march or sidle or dive:
+            self.translate(march, sidle, dive)
+            flag = True
+        cur_mx, cur_my = glfw.get_cursor_pos(window)
+        if glfw.get_mouse_button(window, glfw.MOUSE_BUTTON_RIGHT) == glfw.PRESS:
+            del_mx, del_my = cur_mx - self.last_mx, cur_my - self.last_my
+            spin = tilt = 0.
+            if del_mx:
+                spin = self.rev * del_mx * del_time
+#                 self.spin += self.rev * del_mx
+            if del_my:
+                tilt = self.rev * del_my * del_time
+            if spin or tilt:
+                self.rotate(spin, tilt)
+                flag = True
+        self.last_mx, self.last_my = cur_mx, cur_my
+        self.last_time = cur_time
+        if flag:
+            self._update_orientation()
+            self._update_view_mat()
     
     def keyboard_callback(self, window, key, scancode, action, mods):
         if action == glfw.PRESS or action == glfw.REPEAT:

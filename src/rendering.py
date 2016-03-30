@@ -267,6 +267,7 @@ class Renderer(Thread):
 #         self.cam_obs = self._Camera()  # the camera for human observation
         self.cam_obs = Camera_fps() # the camera for human observation
         self.cam_obs.bind_input(self.window.handle)
+        self.cam_obs.init_input(self.window.handle)
 #         self.cam_obs.view_mat = self.look_at(vec3(-1, 2, 5),
 #                                    vec3(0, 0, 0),
 #                                    vec3(0, 1, 0))
@@ -837,6 +838,7 @@ class Renderer(Thread):
         self._init_finished_lock.release()
 #         self.optimize()
         while not glfw.window_should_close(self.window.handle) and self._cont_flag:
+            self.cam_obs.poll_event(self.window.handle)
             self.param_lock.acquire()
             glDrawBuffer(GL_BACK)
             self.draw(None)
