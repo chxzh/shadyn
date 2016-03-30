@@ -3,7 +3,7 @@ from functools import wraps
 from IPython.core.magic_arguments import kwds
 from _imaging import path
 import numpy as np
-import os
+import os, traceback
 try:
    import cPickle as pickle
 except:
@@ -117,6 +117,8 @@ def plot_task(f):
         try:
             res = f(cls, *args, **kwds)
             return res
+        except:
+            traceback.print_last()
         finally:
             
             cls.plotter.set_method(cls._method_name) # TODO: terrible accessing

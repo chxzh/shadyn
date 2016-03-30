@@ -668,7 +668,7 @@ class Optimizer(Thread):
                                                 target_image=self._target_img,
                                                 atb_controls=False)
                                    
-        print "after reboot"             
+        print "after reboot"
         self.renderer.set_param(x)
         print "after setting x"
         # build optimizer
