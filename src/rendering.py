@@ -202,6 +202,7 @@ class Renderer(Thread):
 
         self.cube_model = self._Model(Object("../obj/cube.obj"))
         self.sphere_model = self._Model(Object("../obj/sphere/sphere.obj"))
+        self.tetre_model = self._Model(Object("../obj/tetrahedron.obj"))
 #         self.cube.obj = Object("../obj/cube.obj")
 #         self.cube = self._Item(self.cube_model)
 #         self.cube.scale = vec3(0.6, 0.6, 0.6)
@@ -215,12 +216,14 @@ class Renderer(Thread):
 #         medium_cube.position = vec3(0.2, 0.5, 0.7)
 # #         medium_cube.position = vec3(-0.7, 0.,0.7)
 #         self._items.append(medium_cube)
-        for i in xrange(15):
-            sphere = self._Item(self.sphere_model)
-            sphere.scale = vec3(0.1, 0.1, 0.1)
-            self._items.append(sphere)
+        for i in xrange(1):
+            item = self._Item(self.tetre_model)
+            item.scale = vec3(0.15)
+            item.position = vec3(0.75, 0.25, 0.)
+            self._items.append(item)
         self.sphere_model.load_to_buffers()
         self.cube_model.load_to_buffers()
+        self.tetre_model.load_to_buffers()
         # bind buffers
         # indices buffer
 #         self.cube_model.i_buffer = glGenBuffers(1)
@@ -280,7 +283,9 @@ class Renderer(Thread):
 #         self.model_view_inv = (self.cam_obs.view_mat * item.model_mat).inverse()
     #     light_pos = vec3(2,1,0)
     #     light_pos = vec3(2,2,2)
-        self.light_pos = vec3(3, 3, 3)
+        self.light_pos = vec3(3, 3, 0)
+        
+        
         self.cam_obs.V_loc = glGetUniformLocation(self.program_handle, "V")
         glUniformMatrix4fv(self.cam_obs.V_loc, 1, GL_FALSE, self.cam_obs.view_mat.toList())
         self.light_pos_loc = glGetUniformLocation(self.program_handle,
@@ -296,7 +301,9 @@ class Renderer(Thread):
         # init the floor
         self.floor = self._Item(self.cube_model)
         self.floor.position = vec3((0, -0.501, 0))
-        self.floor.scale = vec3(5, 0.1, 5)
+        self.floor.scale = vec3(5, 0.1, 5)        
+        
+        self.init_light_coordinate(self.light_pos, vec3(0,1,0), vec3(0,-0.5,0))
 #         self.floor.model_mat = mat4.translation((0, -0.51, 0)) * mat4.scaling((5, 0.1, 5))
 #         self.floor.MVP = self.cam_obs.proj_mat * self.cam_obs.view_mat * self.floor.model_mat
 #         self.floor.MVinv = (self.cam_obs.view_mat * self.floor.model_mat).inverse()
@@ -418,10 +425,14 @@ class Renderer(Thread):
                                    position=(650, 320), size=(300, 300), valueswidth=150)
         def position_getter_closure(item, index):
             def getter():
+#                 return (self.mat_to_light * item.position)[index]
                 return item.position[index]
             return getter   
         def position_setter_closure(item, index):
             def setter(x):
+#                 pos = self.mat_to_light * item.position
+#                 pos[index] = x
+#                 item.position = self.mat_to_world * pos
                 item.position[index] = x
             return setter        
         def rotation_getter_closure(item, index):
@@ -437,7 +448,7 @@ class Renderer(Thread):
             for j, n in enumerate('xyz'):
                 name = "%s %s" % (group, n)
                 self.control_bar.add_var(name=name, label=n, readonly=False, 
-                                         vtype=atb.TW_TYPE_FLOAT, step=0.05,
+                                         vtype=atb.TW_TYPE_FLOAT, step=0.0005,
                                          group=group,
                                          getter=position_getter_closure(item, j), 
                                          setter=position_setter_closure(item, j))
@@ -487,6 +498,28 @@ class Renderer(Thread):
 #                 atb.TwKeyPressed(tKey, tMod)            
 #         pass
 #         glfw.set_key_callback(self.window.handle, key_pressed_callback)
+    
+    def init_light_coordinate(self, light_pos, receiver_normal, receiver_sample_pos):
+        translation = mat4.translation(-light_pos)
+        translation_inv = mat4.translation(light_pos)
+        z = receiver_normal.normalize()
+        x = (z.cross(vec3(0,0,1)))
+        x = vec3(1,0,0) if x.length() == 0 else x.normalize()
+        y = z.cross(x)
+        rotation_inv = mat4(x,y,z,vec4(0,0,0,1))
+        rotation = rotation_inv.transpose()
+        near, far = 0.1, (light_pos-receiver_sample_pos) * z 
+        perspective = mat4(near, 0, 0, 0,
+                           0, near, 0, 0,
+                           0, 0, (near+far), near*far,
+                           0, 0, -1, 0)
+#         normalizer = mat4.translation((-1,-1,-1)) * 
+#         perspective_inv = mat4.perspective(1, pi/2, near, far)
+#         perspective = perspective_inv.inverse()
+        perspective_inv = perspective.inverse()
+        self.mat_to_light = perspective * rotation * translation
+        self.mat_to_world = translation_inv  * rotation_inv * perspective_inv
+        return
     
     def get_total(self):
         return self.total
@@ -793,7 +826,7 @@ class Renderer(Thread):
         self.param_lock.acquire()        
         for i, item in enumerate(self._items):
             j = i * 6
-            item.position = vec3(x[j: j+3])
+            item.position = vec3(x[j: j+3]) * 0.1
             item.orientation = vec3(x[j+3: j+6])
 #             radius = abs(x[j+6])
 #             item.scale = vec3(radius, radius, radius)
@@ -810,7 +843,7 @@ class Renderer(Thread):
 #         big_cube = self._items[0]
         params = []
         for item in self._items:
-            params.append(item.position)
+            params.append(item.position * 10)
             params.append(item.orientation)
 #             params.append([item.scale[0]])
 #             params.append(item.orientation)

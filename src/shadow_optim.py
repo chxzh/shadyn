@@ -761,7 +761,7 @@ class Optimizer(Thread):
                     print "renderer reboot"
                     yield f(x)
         
-        sigma_0 = 0.1
+        sigma_0 = 1
         ftarget = 1.5e-4
         opts = cma.CMAOptions()
         opts['ftarget'] = ftarget
@@ -902,7 +902,9 @@ class Optimizer(Thread):
     energy_dic = {
                 "XOR comparison": xor_closure,
                 "first moments (normalized)": sq_diff_closure(get_fst_moments),
-                "secondary moments (normalized)": sq_diff_closure(get_sec_moments)
+                "secondary moments (normalized)": sq_diff_closure(get_sec_moments),
+                "uncovered pixels": uncovered_closure,
+                "distance coverage": gradiented_xor_closure
             }
     ### end of Optimizer ###
 
