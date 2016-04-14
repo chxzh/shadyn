@@ -93,7 +93,7 @@ def xor_closure(target):
         return sum(xor_img.getdata())
     return _get_xor
 
-def gradiented_xor_closure(target, radius=1, unprocessed=True):
+def distance_field_closure(target, radius=1, unprocessed=True):
     if unprocessed:
         target = _get_gradient_target(target, radius)
     def _get_xor(image):

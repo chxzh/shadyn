@@ -800,6 +800,7 @@ class Optimizer(Thread):
             
     def set_target(self, image_path):
         # TODO: finish setting the target image
+        self._target_img_path = image_path
         self._target_img = Image.open(image_path)
         self._target_img = self._target_img.convert("L")
         # used to have other pre-computation when setting an target image

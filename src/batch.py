@@ -94,16 +94,23 @@ def all_single_energy_combos():
     
 def vanilla():
     from PIL import Image
-    target_path = "..\\img\\almost_unmoved.png"
-    target_path = "..\\img\\target_mickey.png"
+    target_path = "..\\img\\target_diamond.png"
+    target_path = "..\\img\\target_spade.png"
+#     target_path = "..\\img\\target_mickey.png"
+#     target_path = "..\\img\\target_heart.png"
+#     target_path = "..\\img\\target_forward.png"
+#     target_path = "..\\img\\target_recycle.png"
+    
 #     target_img = Image.open(target_path).convert('L')
     penalties = [Optimizer.penalty_name]
 #     energies = ["first moments (normalized)", "XOR comparison", "secondary moments (normalized)"]
-    energies = ["XOR comparison"]
+#     energies = ["XOR comparison"]
+    energies = ["uncovered pixels", "distance field"]
 #     energies = ["first moments (normalized)"]
 #     energies = ["secondary moments (normalized)"]
 #     energy_pairs = [energies, [1e-4,1,1e-4]]
-    energy_pairs = [energies, [1]]
+    weights = [1,1]
+    energy_pairs = [energies, weights]
     rendis = Renderer_dispatcher()
     rendis.target_image = Image.open(target_path)
     rendis.start()
