@@ -125,7 +125,13 @@ def plot_task(f):
             cls.plotter.plot_result()
             cls.renderer.set_param(cls.best_x)
             # TODO: how to deal with atb parameters unmatch
-            img = cls.renderer.acquire_snapshot()
+            try:
+                img = cls.renderer.acquire_snapshot()
+            except RuntimeError as e:
+                print e.message
+                cls.renderer = cls.rendis.acquire_new()
+                img = cls.renderer.acquire_snapshot()
+                
             img.save(cls.plotter._path + "\\final_result_snapshot.png") # TODO: ehh
             img = cls.renderer.acquire_full_snapshot()
             img.save(cls.plotter._path + "\\final_full_snapshot.png") # TODO: ehh II
