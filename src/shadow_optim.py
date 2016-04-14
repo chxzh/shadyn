@@ -791,7 +791,8 @@ class Optimizer(Thread):
                     % (len(func_names), len(weights))
             raise RuntimeError(err_msg)
         
-        self._energy_list = zip([Optimizer.energy_dic[name](self._target_img) \
+        self._energy_list = zip([Optimizer.energy_dic[name](self._target_img,
+                                                            self._target_img_path) \
                                         for name in func_names],
                                     func_names,
                                     weights)
@@ -905,7 +906,7 @@ class Optimizer(Thread):
                 "first moments (normalized)": sq_diff_closure(get_fst_moments),
                 "secondary moments (normalized)": sq_diff_closure(get_sec_moments),
                 "uncovered pixels": uncovered_closure,
-                "distance coverage": gradiented_xor_closure
+                "distance field": distance_field_closure
             }
     ### end of Optimizer ###
 
