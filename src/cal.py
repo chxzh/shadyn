@@ -45,7 +45,7 @@ def init_X_Y(width, height):
     _X = np.arange(width).reshape(1, width)
     _Y = np.arange(height).reshape(height, 1)
         
-def get_sec_moments(image):
+def get_sec_moments(image, path):
     # image should be a gray scale Image object
     img = 1 - np.array(image.getdata()) / 128 # turn white to 0 and black to 1
     # using 128 in case of gray
@@ -66,7 +66,7 @@ def get_sec_moments(image):
     m_11 = (X_offset*img*Y_offset).sum() / M_00 if M_00 else 0
     return np.array([m_20, m_11, m_02])
     
-def get_fst_moments(image):
+def get_fst_moments(image, path):
     # image should be a gray scale Image object
     img = 1 - np.array(image.getdata()) / 128 # turn white to 0 and black to 1
     # using 128 in case of gray
@@ -83,7 +83,7 @@ def get_fst_moments(image):
     return np.array([m_10, m_01])
 
 from PIL import ImageMath as imath    
-def xor_closure(target):
+def xor_closure(target, path):
     '''
     target shall be a single-band Image instance
     '''
@@ -93,16 +93,23 @@ def xor_closure(target):
         return sum(xor_img.getdata())
     return _get_xor
 
-def distance_field_closure(target, radius=1, unprocessed=True):
-    if unprocessed:
-        target = _get_gradient_target(target, radius)
+import os.path
+def distance_field_closure(target, path, radius=1):    
+    root, ext = os.path.splitext(path)
+    df_cache_path = root + '_df' + ".png"
+    if os.path.exists(df_cache_path):        
+        target = Image.open(df_cache_path)
+        target = target.convert('L')
+    else:
+        target = get_distance_field(target, radius)        
+        target.save(df_cache_path)
     def _get_xor(image):
         xor_img = imath.eval("t*(1-(x>>7))", t=target, x=image)
         return sum(xor_img.getdata())
     return _get_xor
 
 import cv2
-def _get_gradient_target(target, radius=1):
+def get_distance_field(target, radius=1):
     kernel = np.ones((1+radius*2,1+radius*2), np.uint8)
     counter = 1
     original = np.array(target)
@@ -127,19 +134,19 @@ def test_erosion():
 #     image = Image.open("../img/target_forward.png").convert('L')
 #     f = uncovered_closure(target)
 #     res = f(image)
-    _get_gradient_target(target, 1).show()
+    get_distance_field(target, 1).show()
     
-def uncovered_closure(target):
+def uncovered_closure(target, path):
     def _uncover(image): 
         res = imath.eval("((~a)>>7)&(b>>7)", a=target, b=image)
         return sum(res.getdata())
     return _uncover
 
 def sq_diff_closure(func):
-    def sub_closure(target):
-        res_t = func(target)
+    def sub_closure(target, path):
+        res_t = func(target, path)
         def sqdiff(image):
-            return _sq_diff(res_t, func(image))
+            return _sq_diff(res_t, func(image, path))
         return sqdiff
     return sub_closure
 
