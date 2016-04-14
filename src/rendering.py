@@ -216,7 +216,7 @@ class Renderer(Thread):
 #         medium_cube.position = vec3(0.2, 0.5, 0.7)
 # #         medium_cube.position = vec3(-0.7, 0.,0.7)
 #         self._items.append(medium_cube)
-        for i in xrange(1):
+        for i in xrange(15):
             item = self._Item(self.tetre_model)
             item.scale = vec3(0.15)
             item.position = vec3(0.75, 0.25, 0.)
@@ -425,15 +425,15 @@ class Renderer(Thread):
                                    position=(650, 320), size=(300, 300), valueswidth=150)
         def position_getter_closure(item, index):
             def getter():
-#                 return (self.mat_to_light * item.position)[index]
-                return item.position[index]
+                return (self.mat_to_light * item.position)[index]
+#                 return item.position[index]
             return getter   
         def position_setter_closure(item, index):
             def setter(x):
-#                 pos = self.mat_to_light * item.position
-#                 pos[index] = x
-#                 item.position = self.mat_to_world * pos
-                item.position[index] = x
+                pos = self.mat_to_light * item.position
+                pos[index] = x
+                item.position = self.mat_to_world * pos
+#                 item.position[index] = x
             return setter        
         def rotation_getter_closure(item, index):
             def getter():
@@ -573,7 +573,7 @@ class Renderer(Thread):
         # simply a place holder, will be replaced by setting image for
         return 0 
         
-    def __init__(self):
+    def __init__(self, use_light_coord=True):
         Thread.__init__(self)
         if not glfw.init():
             raise RuntimeError("Cannot start up GLFW")
@@ -599,6 +599,7 @@ class Renderer(Thread):
         self._intern_penalty_terms = {"shadow_distance": -23.3, 'x': -23.3, 'y': -23.3}
         self.bg_img = None
         self.atb_controls = True
+        self.use_light_coord(use_light_coord)
     
     def stop(self):
         self._cont_flag = False
@@ -822,7 +823,11 @@ class Renderer(Thread):
 #         self.param_lock.release()
         self.snapshot = img
     
+    # placeholder, the method shall refer to set_param_original or others
     def set_param(self, x):
+        pass
+    
+    def set_param_original(self, x):
         self.param_lock.acquire()        
         for i, item in enumerate(self._items):
             j = i * 6
@@ -833,13 +838,31 @@ class Renderer(Thread):
         self.param_lock.release()
         return
     
+    def set_param_lightcoord(self, x):        
+        self.param_lock.acquire()        
+        for i, item in enumerate(self._items):
+#             j = i * 4
+#             pos = self.mat_to_light * item.position
+#             pos.z = x[j] * 0.2
+#             item.position = self.mat_to_world * pos
+#             item.orientation = vec3(x[j+1: j+4])
+            j = i * 6
+            item.position = self.mat_to_world * (vec3(x[j: j+3]) * 0.01)
+            item.orientation = vec3(x[j+3: j+6])
+        self.param_lock.release()
+        return
+    
     def set_param_indiv(self, x_i, i):
         # set one individual component of the parameters
         x = self.get_param()
         x[i] = x_i
         self.set_param(x)
     
+    # placeholder, the method shall refer to either get_param_original or others
     def get_param(self):
+        pass
+    
+    def get_param_original(self):
 #         big_cube = self._items[0]
         params = []
         for item in self._items:
@@ -848,6 +871,24 @@ class Renderer(Thread):
 #             params.append([item.scale[0]])
 #             params.append(item.orientation)
         return np.concatenate(params)
+    
+    def get_param_lightcoord(self):        
+        params = []
+        for item in self._items:
+#             params.append([(self.mat_to_light * item.position).z * 5])
+            params.append(self.mat_to_light * item.position * 100)
+            params.append(item.orientation)
+#             params.append([item.scale[0]])
+        params = np.concatenate(params)
+        return params
+    
+    def use_light_coord(self, flag=True):
+        if flag:
+            self.set_param = self.set_param_lightcoord
+            self.get_param = self.get_param_lightcoord
+        else:
+            self.set_param = self.set_param_original
+            self.get_param = self.get_param_original
 
     def to_close():
         return False
