@@ -84,10 +84,56 @@ def get_fst_moments(image):
 
 from PIL import ImageMath as imath    
 def xor_closure(target):
+    '''
+    target shall be a single-band Image instance
+    '''
+    target = imath.eval("x>>7", x=target)
     def _get_xor(image):
-        xor_img = imath.eval("a^b", a=image, b=target)
-        return sum(xor_img.getdata())/255
+        xor_img = imath.eval("(a>>7)^b", a=image, b=target)
+        return sum(xor_img.getdata())
     return _get_xor
+
+def gradiented_xor_closure(target, radius=1, unprocessed=True):
+    if unprocessed:
+        target = _get_gradient_target(target, radius)
+    def _get_xor(image):
+        xor_img = imath.eval("t*(1-(x>>7))", t=target, x=image)
+        return sum(xor_img.getdata())
+    return _get_xor
+
+import cv2
+def _get_gradient_target(target, radius=1):
+    kernel = np.ones((1+radius*2,1+radius*2), np.uint8)
+    counter = 1
+    original = np.array(target)
+    res = original.copy()
+    def expand(a, b, value):
+        if a <= value or a == b:
+            return a
+        else:
+            return value
+    expand = lambda a, b, val: a if a <= val or a == b else val
+    expand = np.vectorize(expand)
+    expanded = original.copy()
+    for i in xrange(1, 256):
+        expanded = cv2.erode(expanded, kernel)
+        res = expand(res, expanded, i)
+    res = Image.fromarray(res)
+    return res
+
+def test_erosion():
+    from PIL import Image
+    target = Image.open("../img/target_spade.png").convert('L')
+#     image = Image.open("../img/target_forward.png").convert('L')
+#     f = uncovered_closure(target)
+#     res = f(image)
+    _get_gradient_target(target, 1).show()
+    
+def uncovered_closure(target):
+    def _uncover(image): 
+        res = imath.eval("((~a)>>7)&(b>>7)", a=target, b=image)
+        return sum(res.getdata())
+    return _uncover
 
 def sq_diff_closure(func):
     def sub_closure(target):
@@ -96,3 +142,9 @@ def sq_diff_closure(func):
             return _sq_diff(res_t, func(image))
         return sqdiff
     return sub_closure
+
+def _main():
+    test_erosion()
+
+if __name__ == '__main__':
+    _main()
