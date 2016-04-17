@@ -130,6 +130,12 @@ class Renderer(Thread):
             self.handle = tools.load_program(vert_path, frag_path)
         
         def bind(self, model):
+            glBindVertexArray(model.vao_handle)
+            glUseProgram(self.handle)
+            self.vert_loc = glGetAttribLocation(self.handle, "coord3d")
+            glEnableVertexAttribArray(self.vert_loc)
+            glBindBuffer(GL_ARRAY_BUFFER, model.v_buffer)
+            glVertexAttribPointer(self.vert_loc, 3, GL_FLOAT, GL_FALSE, 0, None)
             pass
         
     class _Background_shader:
@@ -203,6 +209,7 @@ class Renderer(Thread):
         self.cube_model = self._Model(Object("../obj/cube.obj"))
         self.sphere_model = self._Model(Object("../obj/sphere/sphere.obj"))
         self.tetre_model = self._Model(Object("../obj/tetrahedron.obj"))
+        self.icosahe_model = self._Model(Object("../obj/icosahedron.obj"))
 #         self.cube.obj = Object("../obj/cube.obj")
 #         self.cube = self._Item(self.cube_model)
 #         self.cube.scale = vec3(0.6, 0.6, 0.6)
@@ -216,7 +223,7 @@ class Renderer(Thread):
 #         medium_cube.position = vec3(0.2, 0.5, 0.7)
 # #         medium_cube.position = vec3(-0.7, 0.,0.7)
 #         self._items.append(medium_cube)
-        for i in xrange(15):
+        for i in xrange(7):
             item = self._Item(self.tetre_model)
             item.scale = vec3(0.15)
             item.position = vec3(0.75, 0.25, 0.)
@@ -224,6 +231,7 @@ class Renderer(Thread):
         self.sphere_model.load_to_buffers()
         self.cube_model.load_to_buffers()
         self.tetre_model.load_to_buffers()
+        self.icosahe_model.load_to_buffers()
         # bind buffers
         # indices buffer
 #         self.cube_model.i_buffer = glGenBuffers(1)
@@ -283,15 +291,16 @@ class Renderer(Thread):
 #         self.model_view_inv = (self.cam_obs.view_mat * item.model_mat).inverse()
     #     light_pos = vec3(2,1,0)
     #     light_pos = vec3(2,2,2)
-        self.light_pos = vec3(3, 3, 0)
-        
+    
+        self.light_bulb = self._Item(self.icosahe_model)
+        self.light_bulb.position = vec3(3,3,0)
+        self.light_bulb.scale = vec3(0.1)
         
         self.cam_obs.V_loc = glGetUniformLocation(self.program_handle, "V")
         glUniformMatrix4fv(self.cam_obs.V_loc, 1, GL_FALSE, self.cam_obs.view_mat.toList())
         self.light_pos_loc = glGetUniformLocation(self.program_handle,
                                                   "LightPosition_worldspace")
-        glUniform3f(self.light_pos_loc,
-                    self.light_pos.x, self.light_pos.y, self.light_pos.z)
+        glUniform3f(self.light_pos_loc, *self.light_bulb.position)
         self.MVP_loc = glGetUniformLocation(self.program_handle, "MVP")
 #         self.cube.MVP = mat4(1)
         self.M_loc = glGetUniformLocation(self.program_handle, "M")
@@ -303,7 +312,7 @@ class Renderer(Thread):
         self.floor.position = vec3((0, -0.501, 0))
         self.floor.scale = vec3(5, 0.1, 5)        
         
-        self.init_light_coordinate(self.light_pos, vec3(0,1,0), vec3(0,-0.5,0))
+        self.init_light_coordinate(self.light_bulb.position, vec3(0,1,0), vec3(0,-0.5,0))
 #         self.floor.model_mat = mat4.translation((0, -0.51, 0)) * mat4.scaling((5, 0.1, 5))
 #         self.floor.MVP = self.cam_obs.proj_mat * self.cam_obs.view_mat * self.floor.model_mat
 #         self.floor.MVinv = (self.cam_obs.view_mat * self.floor.model_mat).inverse()
@@ -316,23 +325,27 @@ class Renderer(Thread):
         self.shadow.MsVP_loc = glGetUniformLocation(self.shadow_program_handle, "MsVP")
         self.shadow.VP_mat = self.cam_obs.proj_mat * self.cam_obs.view_mat;
         self.shadow.VP_mat_top = self.cam_cap.proj_mat * self.cam_cap.view_mat;
-        self.shadow.shaject_mat = self.shadow_proj_mat(vec3(0, 1, 0), vec3(0, -0.45, 0), self.light_pos)
+        self.shadow.shaject_mat = self.shadow_proj_mat(vec3(0, 1, 0),
+                                                       vec3(0, -0.45, 0),
+                                                       self.light_bulb.position)
         self.shadow.color_loc = glGetUniformLocation(self.shadow.handle, "shadowColor")
         glUniform3f(self.shadow.color_loc, 0.0, 0.0, 0.0)  # black shadow
         self.shadow.alpha_loc = glGetUniformLocation(self.shadow.handle, "alpha")
 
         # init the shader to draw the basic shadow
-        self.basic_program_handle = tools.load_program("../shader/basic.v.glsl",
+#         self.basic_program_handle = tools.load_program("../shader/basic.v.glsl",
+#                                                    "../shader/basic.f.glsl")
+        self.basic_shader = self._Basic_shader("../shader/basic.v.glsl",
                                                    "../shader/basic.f.glsl")
-        glUseProgram(self.basic_program_handle)
-        self.basic_mvp_loc = glGetUniformLocation(self.basic_program_handle, "mvp")
-        basic_mvp = self.cam_cap.proj_mat * self.cam_cap.view_mat * self.floor.model_mat()
+        glUseProgram(self.basic_shader.handle)
+        self.basic_mvp_loc = glGetUniformLocation(self.basic_shader.handle, "mvp")
+        basic_mvp = self.cam_obs.proj_mat * self.cam_obs.view_mat * self.light_bulb.model_mat()
         glUniformMatrix4fv(self.basic_mvp_loc, 1, GL_FALSE, basic_mvp.toList())
-        self.basic_v_loc = glGetAttribLocation(self.basic_program_handle, "coord3d")
-        glEnableVertexAttribArray(self.basic_v_loc)
-        glBindBuffer(GL_ARRAY_BUFFER, self.cube_model.v_buffer)
-        glVertexAttribPointer(self.basic_v_loc, 3, GL_FLOAT, GL_FALSE, 0, None)
-        
+#         self.basic_v_loc = glGetAttribLocation(self.basic_program_handle, "coord3d")
+#         glEnableVertexAttribArray(self.basic_v_loc)
+#         glBindBuffer(GL_ARRAY_BUFFER, self.cube_model.v_buffer)
+#         glVertexAttribPointer(self.basic_v_loc, 3, GL_FLOAT, GL_FALSE, 0, None)
+#         
         self.background_indices = range(4) # will use triangle fans
         far_end = 1 - 1e-4
         self.background_vert = [-1.,  1.,  far_end,
@@ -611,7 +624,7 @@ class Renderer(Thread):
         # Make the window's context current
         self.shadow.shaject_mat = self.shadow_proj_mat(vec3(0, 1, 0), 
                                                        vec3(0, -0.45, 0), 
-                                                       self.light_pos)
+                                                       self.light_bulb.position)
 
         glfw.make_context_current(self.window.handle)
 #         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
@@ -622,7 +635,7 @@ class Renderer(Thread):
         # draw the observation viewport
         glViewport(0, 0, w, h)
         glUseProgram(self.program_handle)
-        glUniform3f(self.light_pos_loc, *self.light_pos)
+        glUniform3f(self.light_pos_loc, *self.light_bulb.position)
         # draw all casters
         for item in self._items:
             self.standard_shader.bind(item.model)
@@ -635,6 +648,14 @@ class Renderer(Thread):
             glUniform3f(self.color_loc, *item.color)
             glDrawElements(GL_TRIANGLES, len(item.model.obj.indices),
                             GL_UNSIGNED_SHORT, None)
+        # draw the light
+        glUseProgram(self.basic_shader.handle)
+        self.basic_shader.bind(self.light_bulb.model)
+        MVP = self.cam_obs.proj_mat * self.cam_obs.view_mat * self.light_bulb.model_mat()
+        glUniformMatrix4fv(self.basic_mvp_loc, 1, GL_FALSE, MVP.toList())
+        glDrawElements(GL_TRIANGLES, len(self.light_bulb.model.obj.indices),
+                        GL_UNSIGNED_SHORT, None)
+        
         # draw the receiver - the floor                            
         self.standard_shader.bind(self.floor.model)     
         glDisable(GL_CULL_FACE)  
@@ -649,6 +670,7 @@ class Renderer(Thread):
         glUniform3f(self.color_loc, 1., 1., 1.)
         glDrawElements(GL_TRIANGLES, len(self.floor.model.obj.indices),
                         GL_UNSIGNED_SHORT, None)
+                
         glDisable(GL_BLEND)
         glEnable(GL_CULL_FACE)
         # draw the projected shadows
@@ -661,6 +683,7 @@ class Renderer(Thread):
                    (self.cam_obs.proj_mat * self.cam_obs.view_mat * self.shadow.shaject_mat * item.model_mat()).toList())
             glDrawElements(GL_TRIANGLES, len(item.model.obj.indices),
                             GL_UNSIGNED_SHORT, None)
+        
 
         # draw the capturing viewport
         glViewport(0, h, w, h)
