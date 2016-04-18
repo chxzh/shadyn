@@ -224,8 +224,8 @@ class Renderer(Thread):
 # #         medium_cube.position = vec3(-0.7, 0.,0.7)
 #         self._items.append(medium_cube)
         for i in xrange(7):
-            item = self._Item(self.tetre_model)
-            item.scale = vec3(0.15)
+            item = self._Item(self.sphere_model)
+            item.scale = vec3(1)
             item.position = vec3(0.75, 0.25, 0.)
             self._items.append(item)
         self.sphere_model.load_to_buffers()
@@ -303,6 +303,7 @@ class Renderer(Thread):
         glUniform3f(self.light_pos_loc, *self.light_bulb.position)
         self.MVP_loc = glGetUniformLocation(self.program_handle, "MVP")
 #         self.cube.MVP = mat4(1)
+        self.V_loc = glGetUniformLocation(self.standard_shader.handle, "V")
         self.M_loc = glGetUniformLocation(self.program_handle, "M")
         self.MVint_loc = glGetUniformLocation(self.program_handle, "MVint")
         self.color_loc = glGetUniformLocation(self.standard_shader.handle, "MaterialDiffuseColor")
@@ -642,7 +643,7 @@ class Renderer(Thread):
             model_view_inv = (self.cam_obs.view_mat * item.model_mat()).inverse()
             glUniformMatrix4fv(self.MVint_loc, 1, GL_TRUE, model_view_inv.toList())
             glUniformMatrix4fv(self.M_loc, 1, GL_FALSE, item.model_mat().toList())
-            
+            glUniformMatrix4fv(self.V_loc, 1, GL_FALSE, self.cam_obs.view_mat.toList())
             MVP = self.cam_obs.proj_mat * self.cam_obs.view_mat * item.model_mat()
             glUniformMatrix4fv(self.MVP_loc, 1, GL_FALSE, MVP.toList())
             glUniform3f(self.color_loc, *item.color)
