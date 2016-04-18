@@ -207,6 +207,7 @@ class Renderer(Thread):
         glUseProgram(self.standard_shader.handle)
 
         self.cube_model = self._Model(Object("../obj/cube.obj"))
+        self.pillar_model = self._Model(Object("../obj/cube_on_floor.obj"))
         self.sphere_model = self._Model(Object("../obj/sphere/sphere.obj"))
         self.tetre_model = self._Model(Object("../obj/tetrahedron.obj"))
         self.icosahe_model = self._Model(Object("../obj/icosahedron.obj"))
@@ -223,6 +224,8 @@ class Renderer(Thread):
 #         medium_cube.position = vec3(0.2, 0.5, 0.7)
 # #         medium_cube.position = vec3(-0.7, 0.,0.7)
 #         self._items.append(medium_cube)
+        self.floor_level = -0.5
+
         for i in xrange(7):
             item = self._Item(self.sphere_model)
             item.scale = vec3(1)
@@ -232,6 +235,7 @@ class Renderer(Thread):
         self.cube_model.load_to_buffers()
         self.tetre_model.load_to_buffers()
         self.icosahe_model.load_to_buffers()
+        self.pillar_model.load_to_buffers()
         # bind buffers
         # indices buffer
 #         self.cube_model.i_buffer = glGenBuffers(1)
@@ -309,9 +313,9 @@ class Renderer(Thread):
         self.color_loc = glGetUniformLocation(self.standard_shader.handle, "MaterialDiffuseColor")
 
         # init the floor
-        self.floor = self._Item(self.cube_model)
-        self.floor.position = vec3((0, -0.501, 0))
-        self.floor.scale = vec3(5, 0.1, 5)        
+        self.floor = self._Item(self.pillar_model)
+        self.floor.position = vec3((0, self.floor_level-0.01, 0))
+        self.floor.scale = vec3(5, -0.1, 5)        
         
         self.init_light_coordinate(self.light_bulb.position, vec3(0,1,0), vec3(0,-0.5,0))
 #         self.floor.model_mat = mat4.translation((0, -0.51, 0)) * mat4.scaling((5, 0.1, 5))
@@ -326,9 +330,9 @@ class Renderer(Thread):
         self.shadow.MsVP_loc = glGetUniformLocation(self.shadow_program_handle, "MsVP")
         self.shadow.VP_mat = self.cam_obs.proj_mat * self.cam_obs.view_mat;
         self.shadow.VP_mat_top = self.cam_cap.proj_mat * self.cam_cap.view_mat;
-        self.shadow.shaject_mat = self.shadow_proj_mat(vec3(0, 1, 0),
-                                                       vec3(0, -0.45, 0),
-                                                       self.light_bulb.position)
+#         self.shadow.shaject_mat = self.shadow_proj_mat(vec3(0, 1, 0),
+#                                                        vec3(0, -0.45, 0),
+#                                                        self.light_bulb.position)
         self.shadow.color_loc = glGetUniformLocation(self.shadow.handle, "shadowColor")
         glUniform3f(self.shadow.color_loc, 0.0, 0.0, 0.0)  # black shadow
         self.shadow.alpha_loc = glGetUniformLocation(self.shadow.handle, "alpha")
@@ -624,7 +628,7 @@ class Renderer(Thread):
         # Render here
         # Make the window's context current
         self.shadow.shaject_mat = self.shadow_proj_mat(vec3(0, 1, 0), 
-                                                       vec3(0, -0.45, 0), 
+                                                       vec3(0, self.floor_level, 0), 
                                                        self.light_bulb.position)
 
         glfw.make_context_current(self.window.handle)
