@@ -16,7 +16,6 @@ from cal import *
 from _collections import deque
 from boto.ec2.autoscale.request import Request
 from idlelib.rpc import request_queue
-from cgkit._OpenGL.GL import GL_FALSE
 
 class Renderer(Thread):
     @classmethod
@@ -224,9 +223,9 @@ class Renderer(Thread):
 #         medium_cube.position = vec3(0.2, 0.5, 0.7)
 # #         medium_cube.position = vec3(-0.7, 0.,0.7)
 #         self._items.append(medium_cube)
-        for i in xrange(1):
-            item = self._Item(self.sphere_model)
-            item.scale = vec3(1)
+        for i in xrange(7):
+            item = self._Item(self.tetre_model)
+            item.scale = vec3(0.15)
             item.position = vec3(0.75, 0.25, 0.)
             self._items.append(item)
         self.sphere_model.load_to_buffers()
@@ -307,7 +306,7 @@ class Renderer(Thread):
         self.M_loc = glGetUniformLocation(self.program_handle, "M")
         self.MVint_loc = glGetUniformLocation(self.program_handle, "MVint")
         self.color_loc = glGetUniformLocation(self.standard_shader.handle, "MaterialDiffuseColor")
-        self.V_loc = glGetUniformLocation(self.standard_shader.handle, "V")
+
         # init the floor
         self.floor = self._Item(self.cube_model)
         self.floor.position = vec3((0, -0.501, 0))
@@ -643,7 +642,7 @@ class Renderer(Thread):
             model_view_inv = (self.cam_obs.view_mat * item.model_mat()).inverse()
             glUniformMatrix4fv(self.MVint_loc, 1, GL_TRUE, model_view_inv.toList())
             glUniformMatrix4fv(self.M_loc, 1, GL_FALSE, item.model_mat().toList())
-            glUniformMatrix4fv(self.V_loc, 1, GL_FALSE, self.cam_obs.view_mat.toList())
+            
             MVP = self.cam_obs.proj_mat * self.cam_obs.view_mat * item.model_mat()
             glUniformMatrix4fv(self.MVP_loc, 1, GL_FALSE, MVP.toList())
             glUniform3f(self.color_loc, *item.color)
