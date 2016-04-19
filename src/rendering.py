@@ -226,10 +226,10 @@ class Renderer(Thread):
 #         self._items.append(medium_cube)
         self.floor_level = -0.5
 
-        for i in xrange(7):
-            item = self._Item(self.sphere_model)
-            item.scale = vec3(1)
-            item.position = vec3(0.75, 0.25, 0.)
+        for i in xrange(1):
+            item = self._Item(self.pillar_model)
+            item.scale = vec3(0.1)
+            item.position = vec3(0.75, self.floor_level, 0.)
             self._items.append(item)
         self.sphere_model.load_to_buffers()
         self.cube_model.load_to_buffers()
@@ -443,15 +443,12 @@ class Renderer(Thread):
                                    position=(650, 320), size=(300, 300), valueswidth=150)
         def position_getter_closure(item, index):
             def getter():
-                return (self.mat_to_light * item.position)[index]
+                return item.position[index]
 #                 return item.position[index]
             return getter   
         def position_setter_closure(item, index):
             def setter(x):
-                pos = self.mat_to_light * item.position
-                pos[index] = x
-                item.position = self.mat_to_world * pos
-#                 item.position[index] = x
+                item.position[index] = x
             return setter        
         def rotation_getter_closure(item, index):
             def getter():
@@ -461,12 +458,21 @@ class Renderer(Thread):
             def setter(x):
                 item.orientation[index] = x
             return setter
+        def param_getter_closure(index):
+            return lambda: self.get_param()[index]
+        def param_setter_closure(index):
+#             def setter(x):
+#                 X = self.get_param()
+#                 X[index] = x
+#                 self.set_param()
+#             return setter
+            return lambda x: self.set_param_indiv(x, index)
         for i, item in enumerate(self._items):
             group = "item_%d" % i
             for j, n in enumerate('xyz'):
                 name = "%s %s" % (group, n)
                 self.control_bar.add_var(name=name, label=n, readonly=False, 
-                                         vtype=atb.TW_TYPE_FLOAT, step=0.0005,
+                                         vtype=atb.TW_TYPE_FLOAT, step=0.05,
                                          group=group,
                                          getter=position_getter_closure(item, j), 
                                          setter=position_setter_closure(item, j))
@@ -478,6 +484,15 @@ class Renderer(Thread):
                                          getter=rotation_getter_closure(item, j), 
                                          setter=rotation_setter_closure(item, j))
             self.control_bar.define("opened=false",group)
+        self.control_bar.add_separator("septr2")
+        param_length = 4
+        for i in xrange(param_length):
+            name = "param[%d]" % i
+            self.control_bar.add_var(name=name, label=name, readonly=False, 
+                                     vtype=atb.TW_TYPE_FLOAT, step=0.05,
+                                     getter=param_getter_closure(i), 
+                                     setter=param_setter_closure(i))
+        
         
         def mouse_button_callback(window, button, action, mods):
             tAction = tButton = -1
@@ -495,6 +510,7 @@ class Renderer(Thread):
         glfw.set_mouse_button_callback(self.window.handle, mouse_button_callback)
         cursor_callback = lambda w, x, y: atb.TwMouseMotion(int(x),int(y))
         glfw.set_cursor_pos_callback(self.window.handle, cursor_callback)
+        
 #         __dll__ = ctypes.CDLL("AntTweakBar64.dll")
 #         def key_pressed_callback(window, key, scancode, action, mods):
 #             tKey = tMod = -1
@@ -591,7 +607,7 @@ class Renderer(Thread):
         # simply a place holder, will be replaced by setting image for
         return 0 
         
-    def __init__(self, use_light_coord=True):
+    def __init__(self, use_light_coord=False):
         Thread.__init__(self)
         if not glfw.init():
             raise RuntimeError("Cannot start up GLFW")
@@ -618,6 +634,7 @@ class Renderer(Thread):
         self.bg_img = None
         self.atb_controls = True
         self.use_light_coord(use_light_coord)
+        self.use_pillars()
     
     def stop(self):
         self._cont_flag = False
@@ -796,19 +813,7 @@ class Renderer(Thread):
         glUniform1i(glGetUniformLocation(self.shadow.handle, "change_depth"), 0)
         glDisable(GL_BLEND)
         
-        atb.TwDraw()
             
-        # handling snapshot request if any
-        if self.ss_update.locked():
-            self._save_snapshot()
-            self.ss_ready.release()
-#             self.ss_update.release()
-        # Swap front and back buffers
-#         self._save_snapshot()
-
-
-        glfw.swap_buffers(self.window.handle)
-        glfw.poll_events()
 
     # called by external threads
     def acquire_snapshot(self):
@@ -879,6 +884,17 @@ class Renderer(Thread):
             item.orientation = vec3(x[j+3: j+6])
         self.param_lock.release()
         return
+        
+    def set_param_pillars(self, x):        
+        self.param_lock.acquire()     
+        for i, item in enumerate(self._items):
+            j = i * 4
+            item.position.x = x[j] * 0.1
+            item.position.z = x[j + 1] * 0.1
+            item.orientation.y = x[j + 2]
+            item.scale.y = x[j + 3] * 0.1
+        self.param_lock.release()
+        return
     
     def set_param_indiv(self, x_i, i):
         # set one individual component of the parameters
@@ -910,6 +926,15 @@ class Renderer(Thread):
         params = np.concatenate(params)
         return params
     
+    def get_param_pillars(self):
+        params = []
+        for item in self._items:
+            params.append(item.position.x * 10)
+            params.append(item.position.z * 10)
+            params.append(item.orientation.y)
+            params.append(item.scale.y * 10)
+        return np.array(params)
+    
     def use_light_coord(self, flag=True):
         if flag:
             self.set_param = self.set_param_lightcoord
@@ -917,6 +942,10 @@ class Renderer(Thread):
         else:
             self.set_param = self.set_param_original
             self.get_param = self.get_param_original
+    
+    def use_pillars(self):
+        self.set_param = self.set_param_pillars
+        self.get_param = self.get_param_pillars
 
     def to_close():
         return False
@@ -932,6 +961,12 @@ class Renderer(Thread):
             self._finalized_lock.acquire()
             self._finalized_lock.release()
         return
+    
+    def _snapshot_handling(self):        
+        # handling snapshot request if any
+        if self.ss_update.locked():
+            self._save_snapshot()
+            self.ss_ready.release()
 
     def run(self):
 #         draw_projected_shadows()
@@ -944,7 +979,11 @@ class Renderer(Thread):
             self.param_lock.acquire()
             glDrawBuffer(GL_BACK)
             self.draw(None)
-            self.param_lock.release()
+            self.param_lock.release()            
+            atb.TwDraw()
+            self._snapshot_handling()
+            glfw.swap_buffers(self.window.handle)
+            glfw.poll_events()
             err = glGetError()
             if err != GL_NO_ERROR: print "Encountered a glError:", err
         atb.shutdown()
