@@ -3,7 +3,7 @@ import tools
 from OpenGL.GL import *
 from app import *
 from ctypes import c_uint8, c_float, c_ushort, c_void_p, c_double
-from math import pi, cos, sin
+from math import pi, cos, sin, atan2, sqrt
 from cgkit.cgtypes import *
 from PIL import Image
 from threading import Thread, Lock, Semaphore
@@ -16,6 +16,7 @@ from cal import *
 from _collections import deque
 from boto.ec2.autoscale.request import Request
 from idlelib.rpc import request_queue
+from astropy.constants.si import alpha
 
 class Renderer(Thread):
     @classmethod
@@ -226,10 +227,11 @@ class Renderer(Thread):
 #         self._items.append(medium_cube)
         self.floor_level = -0.5
 
-        for i in xrange(1):
+        for i in xrange(10):
             item = self._Item(self.pillar_model)
-            item.scale = vec3(0.1)
-            item.position = vec3(0.75, self.floor_level, 0.)
+            item.scale = vec3(0.1,0.4,0.1)
+#             item.position = vec3(0)
+            item.position = vec3(-0.75, self.floor_level, -0.5)
             self._items.append(item)
         self.sphere_model.load_to_buffers()
         self.cube_model.load_to_buffers()
@@ -299,6 +301,7 @@ class Renderer(Thread):
         self.light_bulb = self._Item(self.icosahe_model)
         self.light_bulb.position = vec3(3,3,0)
         self.light_bulb.scale = vec3(0.1)
+        self.light_bulb.height = self.light_bulb.position.y - self.floor_level
         
         self.cam_obs.V_loc = glGetUniformLocation(self.program_handle, "V")
         glUniformMatrix4fv(self.cam_obs.V_loc, 1, GL_FALSE, self.cam_obs.view_mat.toList())
@@ -892,7 +895,21 @@ class Renderer(Thread):
             item.position.x = x[j] * 0.1
             item.position.z = x[j + 1] * 0.1
             item.orientation.y = x[j + 2]
-            item.scale.y = x[j + 3] * 0.1
+            item.scale.y = abs(x[j + 3]) * 0.02
+        self.param_lock.release()
+        return
+    
+    
+    def set_param_pillars_polarcoord(self, x):        
+        self.param_lock.acquire()     
+        for i, item in enumerate(self._items):
+            j = i * 4
+            alpha, d, theta, L = x[j:j+4]
+            alpha, d, theta, L = alpha * 0.1, d * 0.2, theta, abs(L) * 0.1
+            item.position.x = cos(alpha) * d + self.light_bulb.position.x
+            item.position.z = sin(alpha) * d + self.light_bulb.position.z
+            item.orientation.y = theta
+            item.scale.y = self.light_bulb.height * L / (L + d)
         self.param_lock.release()
         return
     
@@ -932,7 +949,24 @@ class Renderer(Thread):
             params.append(item.position.x * 10)
             params.append(item.position.z * 10)
             params.append(item.orientation.y)
-            params.append(item.scale.y * 10)
+            params.append(item.scale.y * 50)
+        return np.array(params)
+    
+    def get_param_pillars_polarcoord(self):
+        params = []
+        for item in self._items:
+            delta_x = item.position.x - self.light_bulb.position.x
+            delta_z = item.position.z - self.light_bulb.position.z
+            alpha = atan2(delta_z, delta_x)
+            d = sqrt(delta_x*delta_x + delta_z*delta_z)
+            h = abs(item.scale.y)
+            L = h * d / (self.light_bulb.height - h)
+            theta = item.orientation.y
+            alpha, d, theta, L = alpha*10, d*5, theta, L * 10
+            params.append(alpha)
+            params.append(d)
+            params.append(theta)
+            params.append(L)
         return np.array(params)
     
     def use_light_coord(self, flag=True):
@@ -944,8 +978,8 @@ class Renderer(Thread):
             self.get_param = self.get_param_original
     
     def use_pillars(self):
-        self.set_param = self.set_param_pillars
-        self.get_param = self.get_param_pillars
+        self.set_param = self.set_param_pillars_polarcoord
+        self.get_param = self.get_param_pillars_polarcoord
 
     def to_close():
         return False
@@ -979,9 +1013,9 @@ class Renderer(Thread):
             self.param_lock.acquire()
             glDrawBuffer(GL_BACK)
             self.draw(None)
+            self._snapshot_handling()
             self.param_lock.release()            
             atb.TwDraw()
-            self._snapshot_handling()
             glfw.swap_buffers(self.window.handle)
             glfw.poll_events()
             err = glGetError()
