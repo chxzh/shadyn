@@ -4,6 +4,7 @@ module holding all case-irrelevant calculations
 from PIL import Image
 from scipy import optimize
 import numpy as np
+from cgkit.cgtypes import *
 def scipy_optimize(name):
     def fmin(f, x):
         res = optimize.minimize(fun=f, x0=x, method=name)
@@ -149,6 +150,24 @@ def sq_diff_closure(func):
             return _sq_diff(res_t, func(image, path))
         return sqdiff
     return sub_closure
+
+def shadow_proj_mat(plane_normal, point_sample, light_pos):
+    if type(plane_normal) is vec3:
+        plane_normal = plane_normal.normalize()
+    elif type(plane_normal) is np.array:
+        plane_normal = plane_normal / np.linalg.norm(plane_normal)
+    else:
+        raise TypeError("What the hell did you put in here as a normal??")
+    n_t = np.array(plane_normal).reshape((1, 3))
+    L = np.array(light_pos).reshape((3, 1))
+    D = -plane_normal * point_sample
+    ntL = np.dot(n_t, L)
+    shad_mat = np.identity(4, float)
+    shad_mat[0:3, 0:3] = L.dot(n_t) - (D + ntL) * np.identity(3)
+    shad_mat[0:3, 3:4] = (D + ntL) * L - L * ntL
+    shad_mat[3:4, 0:3] = n_t
+    shad_mat[3:4, 3:4] = -ntL
+    return mat4(shad_mat.astype(np.float32).T.tolist())
 
 def _main():
     test_erosion()
