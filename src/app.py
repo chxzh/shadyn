@@ -5,7 +5,9 @@ from cgkit.cgtypes import *
 from math import pi, sin, cos, tan
 import math
 from cgkit.lookat import LookAt
+import tools
 
+# obsolete
 class Application:
     def __init__(self):
         glfw.init()
@@ -51,10 +53,7 @@ class Window:
         return
     
     def init(self):
-        glClearColor(self.background_color[0],
-                     self.background_color[1],
-                     self.background_color[2],
-                     self.background_color[3])
+        glClearColor(*self.background_color)
         pass
     
     def draw(self):        
@@ -72,33 +71,44 @@ class Scene:
         pass
 
 
-class Camera:
+class Camera(object):
     def __init__(self,
                  position=None,
                  orientation=None,
                  up=None,
                  projection_matrix=None,
                  resolution=None):
-        self.position = position if position else vec3(0,0,0)
-        self.orientation = orientation.normalize() if orientation and orientation.length() else vec3(0., 0., -1.)
-        self.up = up if up and up.length() else vec3(0.,1.,0.)
+        self.position = vec3(0.) if position is None else vec3(position)
+        if not orientation is None: orientation = vec3(orientation)
+        self.orientation = vec3(0., 0., -1) \
+            if orientation is None or orientation.length == 0 \
+            else orientation
+        if not up is None: up = vec3(up)
+        self.up = vec3(0.,1.,0.) if up is None or up.length() == 0 else up
         self.view_mat = self.look_at(self.position, self.position + self.orientation, self.up)
-        self.resolution = resolution if resolution else (640,480)
+        self.resolution = (640,480) if resolution is None else resolution 
         self.projection_matrix = projection_matrix if projection_matrix\
             else mat4.perspective(math.radians(45),float(self.resolution[0])/self.resolution[1],0.1,100)
         pass
     
-    def look_at(self, position, target, up):
-        self.position = position
-        # TODO: decide where to raise the zero vector exception
-        # when to check if the it is looking at itself        
-        self.orientation = (target - position).normalize()
-        self.up = up
-        # this look-at method has 3 bugs but still usable by fitting it like this
-        self.view_mat = mat4.lookAt(self.position,
-                              self.position*2 - target,
-                              self.up).inverse()
-        return self.view_mat
+    def look_at(self, pos, target, up=None):
+        self.position = pos = vec3(pos)
+        self.orientation = (vec3(target) - pos).normalize()
+        dir = -self.orientation
+        self.up = vec3(0, 1, 0) if up is None else vec3(up).normalize()
+        up = self.up - (self.up * dir) * dir
+        try:
+            up  = up.normalize()
+        except:
+            self.up = up = z.ortho()
+        right = up.cross(dir).normalize()
+        vmat = mat4(right.x, right.y, right.z, 0.0,
+                       up.x,    up.y,    up.z, 0.0,
+                      dir.x,   dir.y,   dir.z, 0.0,
+                        0.0,     0.0,     0.0, 1.0)
+        vmat.translate(-pos)
+        self.view_mat = vmat
+        return vmat
     
     def on_resize(self):
         pass
@@ -261,37 +271,36 @@ class Camera_fps(Camera):
     def cursor_position_callback(self, window, xpos, ypos):
         print xpos, ypos
 
-class Item:
-    def __init__(self, obj, 
-                 position=vec3(0.),
-                 size=vec3(1.),
-                 orientation=vec3(0.),
+class Item(object):
+    color_gen = tools.random_bright_color_generator()
+    def __init__(self, model, 
+                 position=None,
+                 size=None,
+                 orientation=None,
                  static=False):
-        self.object = obj
-        self.position = position
-        self.size = size
-        self.orientation = orientation
-        self.translate_mat = mat4.translation(position)
-        self.scale_mat = mat4.scaling(size)
-        self.rotate_mat = mat4(1.)
-        if not orientation == vec3(0.):
-            # TODO: decide which euler roration system to apply
-            pass                                         
-        self.static = static
+        self.model = model
+        self.position = vec3(0.) if position is None else position
+        self.size = vec3(0.) if size is None else size
+        self.orientation = vec3(0.) if orientation is None else orientation
+        # TODO: 
+        # if static, model_mat updates when moves
+        # if not static, model_mat is calculate on fly
+        self._static = static
+        self.color = vec3(self.color_gen.next())
         return
     
-    def translate(self, offset):
-        self.translate_mat.translate(offset)
-    
-    def scale(self, magnitude):    
-        self.scale_mat.scale(magnitude)
-    
-    def rotate(self, rad_angle, axis):
-        self.rotate_mat.rotate(rad_angle, axis)
-    
-    def get_model_mat(self):
-        return self.translate_mat*self.rotate_mat*self.scale_mat
-
+    @property
+    def model_mat(self):
+        # M = "SRT" = T * R * S
+        m = mat4.translation(self.position)
+        rad = self.orientation.length()
+        try:
+            m.rotate(rad, self.orientation)
+        except ZeroDivisionError as e:
+            pass
+        m.scale(self.scale)
+        return m
+        
 
 class Object:
     def __init__(self, path=None):

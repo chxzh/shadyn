@@ -10,37 +10,33 @@ from threading import Thread, Lock, Semaphore
 import numpy as np
 import atb
 from datetime import datetime as dt
-from cgkit.fob import POSITION
 from random import random, randint
 from cal import *
-from _collections import deque
-from boto.ec2.autoscale.request import Request
-from idlelib.rpc import request_queue
-from astropy.constants.si import alpha
+# ------import ending------
 
 class Renderer(Thread):
-    class _Item:  # a temporary holder of attributes and uniforms
-        color_gen = tools.random_bright_color_generator()
-        def __init__(self, model):
-            self.model = model
-            self.position = vec3(0,0,0)
-            self.orientation = vec3(0,0,0)
-            self.scale = vec3(1,1,1)
-            self.color = vec3(self.color_gen.next())
-        
-        def model_mat(self):
-            # M = "SRT" = T * R * S
-            m = mat4(1.0)
-            m.translate(self.position)
-            rad = self.orientation.length()
-            try:
-                if rad != 0.0: m.rotate(rad, self.orientation)
-            except ZeroDivisionError as e:
-#                 print e.message
-#                 print rad, self.orientation
-                pass
-            m.scale(self.scale)
-            return m
+#     class _Item:  # a temporary holder of attributes and uniforms
+#         color_gen = tools.random_bright_color_generator()
+#         def __init__(self, model):
+#             self.model = model
+#             self.position = vec3(0,0,0)
+#             self.orientation = vec3(0,0,0)
+#             self.scale = vec3(1,1,1)
+#             self.color = vec3(self.color_gen.next())
+#         
+#         def model_mat(self):
+#             # M = "SRT" = T * R * S
+#             m = mat4(1.0)
+#             m.translate(self.position)
+#             rad = self.orientation.length()
+#             try:
+#                 if rad != 0.0: m.rotate(rad, self.orientation)
+#             except ZeroDivisionError as e:
+# #                 print e.message
+# #                 print rad, self.orientation
+#                 pass
+#             m.scale(self.scale)
+#             return m
     
     class _Model: # a holder of obj, buffers and
         def __init__(self, obj):
@@ -185,23 +181,10 @@ class Renderer(Thread):
         self.sphere_model = self._Model(Object("../obj/sphere/sphere.obj"))
         self.tetre_model = self._Model(Object("../obj/tetrahedron.obj"))
         self.icosahe_model = self._Model(Object("../obj/icosahedron.obj"))
-#         self.cube.obj = Object("../obj/cube.obj")
-#         self.cube = self._Item(self.cube_model)
-#         self.cube.scale = vec3(0.6, 0.6, 0.6)
-#         self._items.append(self.cube)
-#         small_cube = self._Item(self.sphere_model)
-#         small_cube.scale = vec3(0.2,0.2,0.2)
-#         small_cube.position = vec3(0.7, 0.1 ,0.7)
-#         self._items.append(small_cube)
-#         medium_cube = self._Item(self.cube_model)
-#         medium_cube.scale = vec3(0.4,0.4,0.4)
-#         medium_cube.position = vec3(0.2, 0.5, 0.7)
-# #         medium_cube.position = vec3(-0.7, 0.,0.7)
-#         self._items.append(medium_cube)
         self.floor_level = -0.5
 
         for i in xrange(10):
-            item = self._Item(self.pillar_model)
+            item = Item(self.pillar_model)
             item.scale = vec3(0.1,0.4,0.1)
 #             item.position = vec3(0)
             item.position = vec3(-0.75, self.floor_level, -0.5)
@@ -262,16 +245,14 @@ class Renderer(Thread):
 #                                    vec3(0, 0, 0),
 #                                    vec3(0, 1, 0))
         self.cam_obs.look_at(vec3(-1,2,5), vec3(0,0,0))
-        self.cam_cap = self._Camera()  # the camera to capture shadow
-        self.cam_cap.view_mat = self.look_at(vec3(0, 4, 0),
-                                   vec3(0, 0, 0),
-                                   vec3(0, 0, -1))
+        self.cam_cap = Camera()  # the camera to capture shadow
+        self.cam_cap.look_at(vec3(0, 4, 0), vec3(0, 0, 0), vec3(0, 0, -1))
         self.cam_cap.proj_mat = self.cam_obs.proj_mat = mat4.perspective(45, 4. / 3, 0.1, 100)
 #         self.model_view_inv = (self.cam_obs.view_mat * item.model_mat).inverse()
     #     light_pos = vec3(2,1,0)
     #     light_pos = vec3(2,2,2)
     
-        self.light_bulb = self._Item(self.icosahe_model)
+        self.light_bulb = Item(self.icosahe_model)
         self.light_bulb.position = vec3(3,3,0)
         self.light_bulb.scale = vec3(0.1)
         self.light_bulb.height = self.light_bulb.position.y - self.floor_level
@@ -289,7 +270,7 @@ class Renderer(Thread):
         self.color_loc = glGetUniformLocation(self.standard_shader.handle, "MaterialDiffuseColor")
 
         # init the floor
-        self.floor = self._Item(self.pillar_model)
+        self.floor = Item(self.pillar_model)
         self.floor.position = vec3((0, self.floor_level-0.01, 0))
         self.floor.scale = vec3(5, -0.1, 5)        
         
@@ -317,7 +298,7 @@ class Renderer(Thread):
                                                    "../shader/basic.f.glsl")
         glUseProgram(self.basic_shader.handle)
         self.basic_mvp_loc = glGetUniformLocation(self.basic_shader.handle, "mvp")
-        basic_mvp = self.cam_obs.proj_mat * self.cam_obs.view_mat * self.light_bulb.model_mat()
+        basic_mvp = self.cam_obs.proj_mat * self.cam_obs.view_mat * self.light_bulb.model_mat
         glUniformMatrix4fv(self.basic_mvp_loc, 1, GL_FALSE, basic_mvp.toList())
 #         self.basic_v_loc = glGetAttribLocation(self.basic_program_handle, "coord3d")
 #         glEnableVertexAttribArray(self.basic_v_loc)
@@ -586,8 +567,7 @@ class Renderer(Thread):
             raise RuntimeError("Cannot start up GLFW")
         self.flatten = lambda l: [u for t in l for u in t]
         self.c_array = lambda c_type: lambda l: (c_type * len(l))(*l)
-        # TODO: rewrite this stupid expedient look_at function
-        self.look_at = lambda eye, at, up: mat4.lookAt(eye, 2 * eye - at, up).inverse()
+#         self.look_at = lambda eye, at, up: mat4.lookAt(eye, 2 * eye - at, up).inverse()
 #         self.init()
         self.ss_update = Lock() # ss is short for snapshot
 #         self.ss_ready = Lock()
@@ -631,11 +611,11 @@ class Renderer(Thread):
         # draw all casters
         for item in self._items:
             self.standard_shader.bind(item.model)
-            model_view_inv = (self.cam_obs.view_mat * item.model_mat()).inverse()
+            model_view_inv = (self.cam_obs.view_mat * item.model_mat).inverse()
             glUniformMatrix4fv(self.MVint_loc, 1, GL_TRUE, model_view_inv.toList())
-            glUniformMatrix4fv(self.M_loc, 1, GL_FALSE, item.model_mat().toList())
+            glUniformMatrix4fv(self.M_loc, 1, GL_FALSE, item.model_mat.toList())
             glUniformMatrix4fv(self.V_loc, 1, GL_FALSE, self.cam_obs.view_mat.toList())
-            MVP = self.cam_obs.proj_mat * self.cam_obs.view_mat * item.model_mat()
+            MVP = self.cam_obs.proj_mat * self.cam_obs.view_mat * item.model_mat
             glUniformMatrix4fv(self.MVP_loc, 1, GL_FALSE, MVP.toList())
             glUniform3f(self.color_loc, *item.color)
             glDrawElements(GL_TRIANGLES, len(item.model.obj.indices),
@@ -643,7 +623,7 @@ class Renderer(Thread):
         # draw the light
         glUseProgram(self.basic_shader.handle)
         self.basic_shader.bind(self.light_bulb.model)
-        MVP = self.cam_obs.proj_mat * self.cam_obs.view_mat * self.light_bulb.model_mat()
+        MVP = self.cam_obs.proj_mat * self.cam_obs.view_mat * self.light_bulb.model_mat
         glUniformMatrix4fv(self.basic_mvp_loc, 1, GL_FALSE, MVP.toList())
         glDrawElements(GL_TRIANGLES, len(self.light_bulb.model.obj.indices),
                         GL_UNSIGNED_SHORT, None)
@@ -653,9 +633,9 @@ class Renderer(Thread):
         glDisable(GL_CULL_FACE)  
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        MVint = (self.cam_obs.view_mat * self.floor.model_mat()).inverse()
+        MVint = (self.cam_obs.view_mat * self.floor.model_mat).inverse()
         glUniformMatrix4fv(self.MVint_loc, 1, GL_TRUE, MVint.toList())
-        M = self.floor.model_mat()
+        M = self.floor.model_mat
         glUniformMatrix4fv(self.M_loc, 1, GL_FALSE, M.toList())
         MVP = self.cam_obs.proj_mat * self.cam_obs.view_mat * M
         glUniformMatrix4fv(self.MVP_loc, 1, GL_FALSE, MVP.toList())
@@ -672,7 +652,7 @@ class Renderer(Thread):
         for item in self._items:
             self.shadow.bind(item.model)
             glUniformMatrix4fv(self.shadow.MsVP_loc, 1, GL_FALSE,
-                   (self.cam_obs.proj_mat * self.cam_obs.view_mat * self.shadow.shaject_mat * item.model_mat()).toList())
+                   (self.cam_obs.proj_mat * self.cam_obs.view_mat * self.shadow.shaject_mat * item.model_mat).toList())
             glDrawElements(GL_TRIANGLES, len(item.model.obj.indices),
                             GL_UNSIGNED_SHORT, None)
         
@@ -727,7 +707,7 @@ class Renderer(Thread):
         for item in self._items:
             self.shadow.bind(item.model)
             glUniformMatrix4fv(self.shadow.MsVP_loc, 1, GL_FALSE,
-                   (self.shadow.VP_mat_top * self.shadow.shaject_mat * item.model_mat()).toList())
+                   (self.shadow.VP_mat_top * self.shadow.shaject_mat * item.model_mat).toList())
     
     #         glUniformMatrix4fv(shadow_M_loc, 1, GL_FALSE, model_mat.toList())
     #         glUniformMatrix4fv(shadow_VP_loc, 1, GL_FALSE, VP_mat_top.toList())
@@ -767,7 +747,7 @@ class Renderer(Thread):
         for item in self._items:
             self.shadow.bind(item.model)
             glUniformMatrix4fv(self.shadow.MsVP_loc, 1, GL_FALSE,
-                   (self.shadow.VP_mat_top * self.shadow.shaject_mat * item.model_mat()).toList())
+                   (self.shadow.VP_mat_top * self.shadow.shaject_mat * item.model_mat).toList())
 #             glUniform3f(glGetUniformLocation(self.shadow.handle, "shadowColor"),
 #                         0., 0., 0.)
 #             glDrawElements(GL_LINE_LOOP, len(item.model.obj.indices),
