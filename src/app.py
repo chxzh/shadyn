@@ -43,7 +43,7 @@ class Application:
         return
         
 
-class Window:
+class Window(object):
     DF_BG_COLOR = (0.0, 0.0, 0.2, 1.0)
     DF_POSITION = (9, 36)
     DF_INTERVAL = 1
