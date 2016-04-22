@@ -6,6 +6,7 @@ from math import pi, sin, cos, tan
 import math
 from cgkit.lookat import LookAt
 import tools
+from ctypes import c_uint8, c_float, c_ushort, c_void_p, c_double
 
 # obsolete
 class Application:
@@ -330,7 +331,7 @@ class Item(object):
         return m
         
 
-class Object(object):
+class Model(object):
     def __init__(self, path=None):
         self.vertices = []
         self.normals = []
@@ -426,7 +427,9 @@ class Object(object):
                 self.indices.append(index)
         return            
     
-    _flatten = lambda line: [val for tuple in line for val in tuple]
+    @staticmethod
+    def _flatten(line): 
+        return [val for tuple in line for val in tuple]
     
     def load_to_buffers(self):
         """
@@ -437,19 +440,19 @@ class Object(object):
         self.i_buffer = glGenBuffers(1)
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.i_buffer)
         glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-                     (c_ushort * len(self.obj.indices))(*self.obj.indices),
+                     (c_ushort * len(self.indices))(*self.indices),
                      GL_STATIC_DRAW)
         # vertices buffer
         self.v_buffer = glGenBuffers(1)
         glBindBuffer(GL_ARRAY_BUFFER, self.v_buffer)
-        v_flatten = self.flatten(self.obj.vertices)
+        v_flatten = self._flatten(self.vertices)
         glBufferData(GL_ARRAY_BUFFER,
                      (c_float * len(v_flatten))(*v_flatten),
                      GL_STATIC_DRAW)
         # normals buffer
         self.n_buffer = glGenBuffers(1)
         glBindBuffer(GL_ARRAY_BUFFER, self.n_buffer)
-        n_flatten = self.flatten(self.obj.normals)
+        n_flatten = self._flatten(self.normals)
         glBufferData(GL_ARRAY_BUFFER,
                      (c_float * len(n_flatten))(*n_flatten),
                      GL_STATIC_DRAW)

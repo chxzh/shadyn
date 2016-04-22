@@ -182,11 +182,11 @@ class Renderer(Thread):
         self.program_handle = self.standard_shader.handle                                        
         glUseProgram(self.standard_shader.handle)
 
-        self.cube_model = self._Model(Object("../obj/cube.obj"))
-        self.pillar_model = self._Model(Object("../obj/cube_on_floor.obj"))
-        self.sphere_model = self._Model(Object("../obj/sphere/sphere.obj"))
-        self.tetre_model = self._Model(Object("../obj/tetrahedron.obj"))
-        self.icosahe_model = self._Model(Object("../obj/icosahedron.obj"))
+        self.cube_model = Model("../obj/cube.obj")
+        self.pillar_model = Model("../obj/cube_on_floor.obj")
+        self.sphere_model = Model("../obj/sphere/sphere.obj")
+        self.tetre_model = Model("../obj/tetrahedron.obj")
+        self.icosahe_model = Model("../obj/icosahedron.obj")
         self.floor_level = -0.5
 
         for i in xrange(10):
@@ -596,14 +596,14 @@ class Renderer(Thread):
             MVP = self.cam_obs.proj_mat * self.cam_obs.view_mat * item.model_mat
             glUniformMatrix4fv(self.MVP_loc, 1, GL_FALSE, MVP.toList())
             glUniform3f(self.color_loc, *item.color)
-            glDrawElements(GL_TRIANGLES, len(item.model.obj.indices),
+            glDrawElements(GL_TRIANGLES, len(item.model.indices),
                             GL_UNSIGNED_SHORT, None)
         # draw the light
         glUseProgram(self.basic_shader.handle)
         self.basic_shader.bind(self.light_bulb.model)
         MVP = self.cam_obs.proj_mat * self.cam_obs.view_mat * self.light_bulb.model_mat
         glUniformMatrix4fv(self.basic_mvp_loc, 1, GL_FALSE, MVP.toList())
-        glDrawElements(GL_TRIANGLES, len(self.light_bulb.model.obj.indices),
+        glDrawElements(GL_TRIANGLES, len(self.light_bulb.model.indices),
                         GL_UNSIGNED_SHORT, None)
         
         # draw the receiver - the floor                            
@@ -618,7 +618,7 @@ class Renderer(Thread):
         MVP = self.cam_obs.proj_mat * self.cam_obs.view_mat * M
         glUniformMatrix4fv(self.MVP_loc, 1, GL_FALSE, MVP.toList())
         glUniform3f(self.color_loc, 1., 1., 1.)
-        glDrawElements(GL_TRIANGLES, len(self.floor.model.obj.indices),
+        glDrawElements(GL_TRIANGLES, len(self.floor.model.indices),
                         GL_UNSIGNED_SHORT, None)
                 
         glDisable(GL_BLEND)
@@ -631,7 +631,7 @@ class Renderer(Thread):
             self.shadow.bind(item.model)
             glUniformMatrix4fv(self.shadow.MsVP_loc, 1, GL_FALSE,
                    (self.cam_obs.proj_mat * self.cam_obs.view_mat * self.shadow.shaject_mat * item.model_mat).toList())
-            glDrawElements(GL_TRIANGLES, len(item.model.obj.indices),
+            glDrawElements(GL_TRIANGLES, len(item.model.indices),
                             GL_UNSIGNED_SHORT, None)
         
 
@@ -641,7 +641,7 @@ class Renderer(Thread):
         
 #         glUseProgram(self.basic_program_handle)
 #         # needs binding the floor
-#         glDrawElements(GL_TRIANGLES, len(self.floor.model.obj.indices),
+#         glDrawElements(GL_TRIANGLES, len(self.floor.model.indices),
 #                         GL_UNSIGNED_SHORT, None)
         
         glUseProgram(self.bg_shader.handle)
@@ -689,7 +689,7 @@ class Renderer(Thread):
     
     #         glUniformMatrix4fv(shadow_M_loc, 1, GL_FALSE, model_mat.toList())
     #         glUniformMatrix4fv(shadow_VP_loc, 1, GL_FALSE, VP_mat_top.toList())
-            glDrawElements(GL_TRIANGLES, len(item.model.obj.indices),
+            glDrawElements(GL_TRIANGLES, len(item.model.indices),
                             GL_UNSIGNED_SHORT, None)
         glDisable(GL_BLEND)
         
@@ -713,7 +713,7 @@ class Renderer(Thread):
         glBindTexture(GL_TEXTURE_2D, self.bg_tex_handle)
         glDrawElements(GL_TRIANGLE_FAN, len(self.background_indices), GL_UNSIGNED_SHORT, None)
 #         glUseProgram(self.basic_program_handle)
-#         glDrawElements(GL_TRIANGLES, len(self.floor.model.obj.indices),
+#         glDrawElements(GL_TRIANGLES, len(self.floor.model.indices),
 #                         GL_UNSIGNED_SHORT, None)
         
         glUseProgram(self.shadow_program_handle)
@@ -728,7 +728,7 @@ class Renderer(Thread):
                    (self.shadow.VP_mat_top * self.shadow.shaject_mat * item.model_mat).toList())
 #             glUniform3f(glGetUniformLocation(self.shadow.handle, "shadowColor"),
 #                         0., 0., 0.)
-#             glDrawElements(GL_LINE_LOOP, len(item.model.obj.indices),
+#             glDrawElements(GL_LINE_LOOP, len(item.model.indices),
 #                             GL_UNSIGNED_SHORT, None)
             glUniform3f(glGetUniformLocation(self.shadow.handle, "shadowColor"),
                         *item.color)
@@ -736,7 +736,7 @@ class Renderer(Thread):
                         1/(item.position.y**2 + 1.001))
     #         glUniformMatrix4fv(shadow_M_loc, 1, GL_FALSE, model_mat.toList())
     #         glUniformMatrix4fv(shadow_VP_loc, 1, GL_FALSE, VP_mat_top.toList())
-            glDrawElements(GL_TRIANGLES, len(item.model.obj.indices),
+            glDrawElements(GL_TRIANGLES, len(item.model.indices),
                             GL_UNSIGNED_SHORT, None)
         glUniform1i(glGetUniformLocation(self.shadow.handle, "change_depth"), 0)
         glDisable(GL_BLEND)
