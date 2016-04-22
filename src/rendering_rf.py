@@ -15,28 +15,35 @@ from cal import *
 # ------import ending------
 
 class Renderer(Thread):
-#     class _Item:  # a temporary holder of attributes and uniforms
-#         color_gen = tools.random_bright_color_generator()
-#         def __init__(self, model):
-#             self.model = model
-#             self.position = vec3(0,0,0)
-#             self.orientation = vec3(0,0,0)
-#             self.scale = vec3(1,1,1)
-#             self.color = vec3(self.color_gen.next())
-#         
-#         def model_mat(self):
-#             # M = "SRT" = T * R * S
-#             m = mat4(1.0)
-#             m.translate(self.position)
-#             rad = self.orientation.length()
-#             try:
-#                 if rad != 0.0: m.rotate(rad, self.orientation)
-#             except ZeroDivisionError as e:
-# #                 print e.message
-# #                 print rad, self.orientation
-#                 pass
-#             m.scale(self.scale)
-#             return m
+    def __init__(self, use_light_coord=False):
+        Thread.__init__(self)
+        if not glfw.init():
+            raise RuntimeError("Cannot start up GLFW")
+        self.flatten = lambda l: [u for t in l for u in t]
+        self.c_array = lambda c_type: lambda l: (c_type * len(l))(*l)
+#         self.look_at = lambda eye, at, up: mat4.lookAt(eye, 2 * eye - at, up).inverse()
+#         self.init()
+        self.ss_update = Lock() # ss is short for snapshot
+#         self.ss_ready = Lock()
+#         self.ss_ready.acquire()
+        self.ss_ready = Semaphore(0)
+        self.snapshot = None
+        self.param_lock = Lock()
+        self._init_finished_lock = Lock()
+        self._init_finished_lock.acquire()
+        self._finalized_lock = Lock()
+        self._finalized_lock.acquire()
+        self._items = []
+        self._cont_flag = True
+        self._energy_terms = {}
+        self._extern_penalty_terms = {}
+        self._intern_penalty_terms = {"shadow_distance": -23.3, 'x': -23.3, 'y': -23.3}
+        self.bg_img = None
+        self.atb_controls = True
+        self.use_light_coord(use_light_coord)
+        self.use_pillars()        
+        self.viewport_size = w, h = (640, 480)
+        self.window = Window(w*3/2, h*2, "scene")
     
     class _Model: # a holder of obj, buffers and
         def __init__(self, obj):
@@ -76,9 +83,6 @@ class Renderer(Thread):
 #             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.i_buffer)
 #             glBindBuffer(GL_ARRAY_BUFFER, self.v_buffer)
 #             glBindBuffer(GL_ARRAY_BUFFER, self.n_buffer)
-
-    class _Window:  # a windows attribute holder
-        pass
     
     class _Camera:
         pass
@@ -157,18 +161,20 @@ class Renderer(Thread):
 
     def init(self):
         # windows initialization
-        self.window = self._Window()        
-        self.viewport_size = w, h = (640, 480)
-        self.window.width, self.window.height = (w*3/2, h*2)
-        self.window.handle = glfw.create_window(self.window.width, self.window.height, "scene", None, None)
-        if self.window.handle == None:
-            glfw.terminate()
-            raise RuntimeError("GLFW cannot create a window.")
-        glfw.set_window_pos(self.window.handle, 9, 36)
-        glfw.make_context_current(self.window.handle)
-        glfw.set_input_mode(self.window.handle, glfw.STICKY_KEYS, 1)
-        glfw.swap_interval(1)
-        glClearColor(0.0, 0.0, 0.2, 1.0)
+#         self.window = self._Window()        
+        self.window.init()
+#         self.window.width, self.window.height = (w*3/2, h*2)
+#         self.window.handle = glfw.create_window(self.window.width,
+#                                                 self.window.height,
+#                                                 "scene", None, None)
+#         if self.window.handle == None:
+#             glfw.terminate()
+#             raise RuntimeError("GLFW cannot create a window.")
+#         glfw.set_window_pos(self.window.handle, 9, 36)
+#         glfw.make_context_current(self.window.handle)
+#         glfw.set_input_mode(self.window.handle, glfw.STICKY_KEYS, 1)
+#         glfw.swap_interval(1)
+#         glClearColor(0.0, 0.0, 0.2, 1.0)
 
         # default blinn-phong shader loading
         self.standard_shader = self._Shader("../shader/standardShading.v.glsl",
@@ -560,35 +566,7 @@ class Renderer(Thread):
     def scene_penalty(self):
         # simply a place holder, will be replaced by setting image for
         return 0 
-        
-    def __init__(self, use_light_coord=False):
-        Thread.__init__(self)
-        if not glfw.init():
-            raise RuntimeError("Cannot start up GLFW")
-        self.flatten = lambda l: [u for t in l for u in t]
-        self.c_array = lambda c_type: lambda l: (c_type * len(l))(*l)
-#         self.look_at = lambda eye, at, up: mat4.lookAt(eye, 2 * eye - at, up).inverse()
-#         self.init()
-        self.ss_update = Lock() # ss is short for snapshot
-#         self.ss_ready = Lock()
-#         self.ss_ready.acquire()
-        self.ss_ready = Semaphore(0)
-        self.snapshot = None
-        self.param_lock = Lock()
-        self._init_finished_lock = Lock()
-        self._init_finished_lock.acquire()
-        self._finalized_lock = Lock()
-        self._finalized_lock.acquire()
-        self._items = []
-        self._cont_flag = True
-        self._energy_terms = {}
-        self._extern_penalty_terms = {}
-        self._intern_penalty_terms = {"shadow_distance": -23.3, 'x': -23.3, 'y': -23.3}
-        self.bg_img = None
-        self.atb_controls = True
-        self.use_light_coord(use_light_coord)
-        self.use_pillars()
-    
+           
     def stop(self):
         self._cont_flag = False
 
@@ -766,6 +744,7 @@ class Renderer(Thread):
             
 
     # called by external threads
+    
     def acquire_snapshot(self):
         self.ss_update.acquire()
         self.ss_ready.acquire()
@@ -953,7 +932,7 @@ class Renderer(Thread):
 #         draw_projected_shadows()        
         self.init()
         self._init_finished_lock.release()
-        while not glfw.window_should_close(self.window.handle) and self._cont_flag:
+        while not self.window.is_stopped() and self._cont_flag:
             self.cam_obs.poll_event(self.window.handle)
             self.param_lock.acquire()
             glDrawBuffer(GL_BACK)

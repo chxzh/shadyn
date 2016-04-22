@@ -44,18 +44,46 @@ class Application:
         
 
 class Window:
-    def __init__(self, width=640, length=480, title="title"):
+    DF_BG_COLOR = (0.0, 0.0, 0.2, 1.0)
+    DF_POSITION = (9, 36)
+    DF_INTERVAL = 1
+    DF_SHUTDOWN_KEY = glfw.KEY_ESCAPE
+    def __init__(self, width=640, height=480, title="title"):
         self.width = width
-        self.length = length
+        self.height = height
         self.title = title
-        self.handle = glfw.create_window(width, length, title, None, None);
-        self.background_color = (0.0, 0.0, 0.2, 1.0)
+        self.handle = None 
+        self.background_color = self.DF_BG_COLOR
+        self.terminate_key = self.DF_SHUTDOWN_KEY
         return
     
     def init(self):
+        '''
+        initialization that must be done in rendering thread
+        '''
+        # creating the opengl context
+        self.handle = glfw.create_window(self.width, self.height, self.title, None, None);
+        if self.handle == None:
+            glfw.terminate()
+            msg = "GLFW cannot create the window: width={width}, height={height}, title={title}".format(
+                    width=self.width, height=self.height, title=self.title)
+            raise RuntimeError(msg)
+        glfw.set_window_pos(self.handle, *self.DF_POSITION)
+        glfw.make_context_current(self.handle)
+        glfw.set_input_mode(self.handle, glfw.STICKY_KEYS, 1)
+        glfw.swap_interval(self.DF_INTERVAL)
         glClearColor(*self.background_color)
-        pass
     
+    def is_stopped(self):
+        return glfw.get_key(self.handle, self.terminate_key) == glfw.PRESS\
+            or glfw.window_should_close(self.handle)
+        
+    @property
+    def resolution(self):
+        return (self.width, self.height)
+    shape = resolution
+    
+    # TODO: determine what should be draw by a window object
     def draw(self):        
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         return
