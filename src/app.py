@@ -330,17 +330,22 @@ class Item(object):
         return m
         
 
-class Object:
+class Object(object):
     def __init__(self, path=None):
         self.vertices = []
         self.normals = []
         self.texcoords = []
         self.indices = []
+        self.i_buffer = -1 # index buffer handle
+        self.v_buffer = -1 # vertex buffer handle
+        self.n_buffer = -1 # normal buffer handle
+        self.vao_handle = -1 # vertex attributes object (VAO) handle
         # if the path is not provided, presumably attributes will be filled in
         # afterward
         if path == None:
             return
-        else: self.load_from_file(path)
+        else:
+            self.load_from_file(path)
         return
     
     def load_from_file(self, path=None):
@@ -421,6 +426,36 @@ class Object:
                 self.indices.append(index)
         return            
     
+    _flatten = lambda line: [val for tuple in line for val in tuple]
+    
+    def load_to_buffers(self):
+        """
+        must be called in the rendering thread
+        """
+        self.vao_handle = glGenVertexArrays(1)
+        glBindVertexArray(self.vao_handle)
+        self.i_buffer = glGenBuffers(1)
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.i_buffer)
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+                     (c_ushort * len(self.obj.indices))(*self.obj.indices),
+                     GL_STATIC_DRAW)
+        # vertices buffer
+        self.v_buffer = glGenBuffers(1)
+        glBindBuffer(GL_ARRAY_BUFFER, self.v_buffer)
+        v_flatten = self.flatten(self.obj.vertices)
+        glBufferData(GL_ARRAY_BUFFER,
+                     (c_float * len(v_flatten))(*v_flatten),
+                     GL_STATIC_DRAW)
+        # normals buffer
+        self.n_buffer = glGenBuffers(1)
+        glBindBuffer(GL_ARRAY_BUFFER, self.n_buffer)
+        n_flatten = self.flatten(self.obj.normals)
+        glBufferData(GL_ARRAY_BUFFER,
+                     (c_float * len(n_flatten))(*n_flatten),
+                     GL_STATIC_DRAW)
+    
+    def bind(self):
+        glBindVertexArray(self.vao_handle)
     
 def _main():
     pass
