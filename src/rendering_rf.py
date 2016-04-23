@@ -45,44 +45,6 @@ class Renderer(Thread):
         self.viewport_size = w, h = (640, 480)
         self.window = Window(w*3/2, h*2, "scene")
     
-    class _Model: # a holder of obj, buffers and
-        def __init__(self, obj):
-            self.obj = obj
-            self.flatten = lambda l: [u for t in l for u in t]
-            
-        
-#         @staticmethod
-#         def flatten(l):
-#             return [u for t in l for u in t]
-        
-        def load_to_buffers(self):
-            self.vao_handle = glGenVertexArrays(1)
-            glBindVertexArray(self.vao_handle)
-            self.i_buffer = glGenBuffers(1)
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.i_buffer)
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-                         (c_ushort * len(self.obj.indices))(*self.obj.indices),
-                         GL_STATIC_DRAW)
-            # vertices buffer
-            self.v_buffer = glGenBuffers(1)
-            glBindBuffer(GL_ARRAY_BUFFER, self.v_buffer)
-            v_flatten = self.flatten(self.obj.vertices)
-            glBufferData(GL_ARRAY_BUFFER,
-                         (c_float * len(v_flatten))(*v_flatten),
-                         GL_STATIC_DRAW)
-            # normals buffer
-            self.n_buffer = glGenBuffers(1)
-            glBindBuffer(GL_ARRAY_BUFFER, self.n_buffer)
-            n_flatten = self.flatten(self.obj.normals)
-            glBufferData(GL_ARRAY_BUFFER,
-                         (c_float * len(n_flatten))(*n_flatten),
-                         GL_STATIC_DRAW)
-            
-        def bind_vao(self):
-            glBindVertexArray(self.vao_handle)
-#             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.i_buffer)
-#             glBindBuffer(GL_ARRAY_BUFFER, self.v_buffer)
-#             glBindBuffer(GL_ARRAY_BUFFER, self.n_buffer)
     
     class _Camera:
         pass
@@ -160,21 +122,7 @@ class Renderer(Thread):
         pass
 
     def init(self):
-        # windows initialization
-#         self.window = self._Window()        
         self.window.init()
-#         self.window.width, self.window.height = (w*3/2, h*2)
-#         self.window.handle = glfw.create_window(self.window.width,
-#                                                 self.window.height,
-#                                                 "scene", None, None)
-#         if self.window.handle == None:
-#             glfw.terminate()
-#             raise RuntimeError("GLFW cannot create a window.")
-#         glfw.set_window_pos(self.window.handle, 9, 36)
-#         glfw.make_context_current(self.window.handle)
-#         glfw.set_input_mode(self.window.handle, glfw.STICKY_KEYS, 1)
-#         glfw.swap_interval(1)
-#         glClearColor(0.0, 0.0, 0.2, 1.0)
 
         # default blinn-phong shader loading
         self.standard_shader = self._Shader("../shader/standardShading.v.glsl",
@@ -200,63 +148,15 @@ class Renderer(Thread):
         self.tetre_model.load_to_buffers()
         self.icosahe_model.load_to_buffers()
         self.pillar_model.load_to_buffers()
-        # bind buffers
-        # indices buffer
-#         self.cube_model.i_buffer = glGenBuffers(1)
-#         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.cube_model.i_buffer)
-#         glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-#                      (c_ushort * len(self.cube_model.obj.indices))(*self.cube_model.obj.indices),
-#                      GL_STATIC_DRAW)
-#         # vertices buffer
-#         self.cube_model.v_buffer = glGenBuffers(1)
-#         glBindBuffer(GL_ARRAY_BUFFER, self.cube_model.v_buffer)
-#         v_flatten = self.flatten(self.cube_model.obj.vertices)
-#         glBufferData(GL_ARRAY_BUFFER,
-#                      (c_float * len(v_flatten))(*v_flatten),
-#                      GL_STATIC_DRAW)
-#         # normals buffer
-#         self.cube_model.n_buffer = glGenBuffers(1)
-#         glBindBuffer(GL_ARRAY_BUFFER, self.cube_model.n_buffer)
-#         n_flatten = self.flatten(self.cube_model.obj.normals)
-#         glBufferData(GL_ARRAY_BUFFER,
-#                      (c_float * len(n_flatten))(*n_flatten),
-#                      GL_STATIC_DRAW)
-
-        # attributes initializing
-#         self.cube_model.vert_loc = glGetAttribLocation(self.program_handle,
-#                                                  "vertexPosition_modelspace")
-#         glEnableVertexAttribArray(self.cube_model.vert_loc)
-#         glBindBuffer(GL_ARRAY_BUFFER, self.cube_model.v_buffer)
-#         glVertexAttribPointer(self.cube_model.vert_loc, 3, GL_FLOAT, GL_FALSE, 0, None)
-#         # TODO: fix the existing attribute unable to retrieve problem
-#         self.cube_model.norm_loc = glGetAttribLocation(self.program_handle,
-#                                                  "vertexNormal_modelspace")
-#         glEnableVertexAttribArray(self.cube_model.norm_loc)
-#         glBindBuffer(GL_ARRAY_BUFFER, self.cube_model.n_buffer)
-#         glVertexAttribPointer(self.cube_model.norm_loc, 3, GL_FLOAT, GL_FALSE, 0, None)
-
-        # cube uniforms
-#         self.cube.position = vec3(0.5, 0, 1)
-#         self.cube.model_mat = mat4(1.0)
-#         self.cube.model_mat.translate(self.cube.position)
-#         self.cube.model_mat.rotate(pi / 3, vec3(1.0, 0.5, 1.7))
-#         self.cube.model_mat.scale(vec3(0.5))
-
-        # camera initializing
-#         self.cam_obs = self._Camera()  # the camera for human observation
+        
         self.cam_obs = Camera_fps() # the camera for human observation
         self.cam_obs.bind_input(self.window.handle)
         self.cam_obs.init_input(self.window.handle)
-#         self.cam_obs.view_mat = self.look_at(vec3(-1, 2, 5),
-#                                    vec3(0, 0, 0),
-#                                    vec3(0, 1, 0))
         self.cam_obs.look_at(vec3(-1,2,5), vec3(0,0,0))
+        
         self.cam_cap = Camera()  # the camera to capture shadow
         self.cam_cap.look_at(vec3(0, 4, 0), vec3(0, 0, 0), vec3(0, 0, -1))
         self.cam_cap.proj_mat = self.cam_obs.proj_mat = mat4.perspective(45, 4. / 3, 0.1, 100)
-#         self.model_view_inv = (self.cam_obs.view_mat * item.model_mat).inverse()
-    #     light_pos = vec3(2,1,0)
-    #     light_pos = vec3(2,2,2)
     
         self.light_bulb = Item(self.icosahe_model)
         self.light_bulb.position = vec3(3,3,0)
@@ -269,7 +169,6 @@ class Renderer(Thread):
                                                   "LightPosition_worldspace")
         glUniform3f(self.light_pos_loc, *self.light_bulb.position)
         self.MVP_loc = glGetUniformLocation(self.program_handle, "MVP")
-#         self.cube.MVP = mat4(1)
         self.V_loc = glGetUniformLocation(self.standard_shader.handle, "V")
         self.M_loc = glGetUniformLocation(self.program_handle, "M")
         self.MVint_loc = glGetUniformLocation(self.program_handle, "MVint")
@@ -281,9 +180,6 @@ class Renderer(Thread):
         self.floor.scale = vec3(5, -0.1, 5)        
         
         self.init_light_coordinate(self.light_bulb.position, vec3(0,1,0), vec3(0,-0.5,0))
-#         self.floor.model_mat = mat4.translation((0, -0.51, 0)) * mat4.scaling((5, 0.1, 5))
-#         self.floor.MVP = self.cam_obs.proj_mat * self.cam_obs.view_mat * self.floor.model_mat
-#         self.floor.MVinv = (self.cam_obs.view_mat * self.floor.model_mat).inverse()
 
         # initialize shadow projection program
         self.shadow = self._Shadow_shader("../shader/shadowProjectionShading.v.glsl",
@@ -298,19 +194,12 @@ class Renderer(Thread):
         self.shadow.alpha_loc = glGetUniformLocation(self.shadow.handle, "alpha")
 
         # init the shader to draw the basic shadow
-#         self.basic_program_handle = tools.load_program("../shader/basic.v.glsl",
-#                                                    "../shader/basic.f.glsl")
         self.basic_shader = self._Basic_shader("../shader/basic.v.glsl",
                                                    "../shader/basic.f.glsl")
         glUseProgram(self.basic_shader.handle)
         self.basic_mvp_loc = glGetUniformLocation(self.basic_shader.handle, "mvp")
         basic_mvp = self.cam_obs.proj_mat * self.cam_obs.view_mat * self.light_bulb.model_mat
         glUniformMatrix4fv(self.basic_mvp_loc, 1, GL_FALSE, basic_mvp.toList())
-#         self.basic_v_loc = glGetAttribLocation(self.basic_program_handle, "coord3d")
-#         glEnableVertexAttribArray(self.basic_v_loc)
-#         glBindBuffer(GL_ARRAY_BUFFER, self.cube_model.v_buffer)
-#         glVertexAttribPointer(self.basic_v_loc, 3, GL_FLOAT, GL_FALSE, 0, None)
-#         
         self.background_indices = range(4) # will use triangle fans
         far_end = 1 - 1e-4
         self.background_vert = [-1.,  1.,  far_end,
@@ -354,17 +243,11 @@ class Renderer(Thread):
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, 1, 1, 0,
                          GL_RED, GL_UNSIGNED_BYTE, '\xff')
         
-#             raise RuntimeError()
         # initializing other stuff
         glEnable(GL_DEPTH_TEST)
         glDepthFunc(GL_LESS)
         glEnable(GL_CULL_FACE)
         
-        
-#         _init_X_Y(self.window.width, self.window.height)
-
-#         self._X = np.arange(self.window.width).reshape(1,self.window.width)
-#         self._Y = np.arange(self.window.height).reshape(self.window.height,1)
         self.init_atb()
         self._init_target_image
     
