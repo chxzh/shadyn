@@ -114,7 +114,10 @@ class Camera(object):
             else orientation
         if not up is None: up = vec3(up)
         self.up = vec3(0.,1.,0.) if up is None or up.length() == 0 else up
-        self.view_mat = self.look_at(self.position, self.position + self.orientation, self.up)
+        self.view_mat = self.look_at(
+                            self.position,
+                            self.position + self.orientation,
+                            self.up)
         self.resolution = (640,480) if resolution is None else resolution 
         self.projection_matrix = projection_matrix if projection_matrix\
             else mat4.perspective(math.radians(45),float(self.resolution[0])/self.resolution[1],0.1,100)
@@ -459,6 +462,150 @@ class Model(object):
     
     def bind(self):
         glBindVertexArray(self.vao_handle)
+
+
+class Shader(object):
+    def __init__(self, vert_shader_path, frag_shader_path):
+        self.v_path = vert_shader_path
+        self.f_path = frag_shader_path
+        self.handle = -1
+        self._program_var_dict = {}
+        pass
+    
+    def init(self):
+        '''Should be run within the OpenGL context, inside the rendering thread'''
+        self._load_program()
+        self._hook_attributes()
+        self._hook_uniforms()
+    
+    def use(self):
+        glUseProgram(self.handle)
+    
+    @staticmethod
+    def _load_shader(shader_code, shader_type):
+        shader_handle = glCreateShader(shader_type)
+        glShaderSource(shader_handle, shader_code)
+        glCompileShader(shader_handle)
+        if glGetShaderiv(shader_handle, GL_COMPILE_STATUS) != GL_TRUE:
+            raise RuntimeError(glGetShaderInfoLog(shader_handle))
+        return shader_handle
+    
+    def _load_program(self):
+        program_handle = glCreateProgram()
+        # extensible if adding tessellation shader, geometry shader and compute shader
+        shader_paths = [(self.v_path, GL_VERTEX_SHADER),
+                       (self.f_path, GL_FRAGMENT_SHADER)]
+        shader_list = []
+        for src_path, shader_type in shader_paths:
+            with open(src_path) as src_file:
+                src = ""
+                for line in src_file.readlines():
+                    src += line
+                shader_handle = self._load_shader(src, shader_type)
+                shader_list.append(shader_handle)
+                glAttachShader(program_handle, shader_handle)
+        glLinkProgram(program_handle)
+        for shader_handle in shader_list:
+            glDetachShader(program_handle, shader_handle)
+            glDeleteShader(shader_handle)
+        self.handle = program_handle
+    
+    def _hook_uniforms(self):
+        n = glGetProgramiv(self.handle, GL_ACTIVE_UNIFORMS)
+        for i in xrange(n):
+            name, size, type = glGetActiveUniform(self.handle, i)
+            self._program_var_dict[name] = self._uniform_setter_closure(name, size, type)
+        pass
+    
+    # abandon vector uniforms
+    # mapping types to uniform setter and parameter wrappers
+    _type_maps_uniform = {
+        GL_FLOAT: glUniform1f,
+        GL_FLOAT_VEC2: glUniform2f,
+        GL_FLOAT_VEC3: glUniform3f,
+        GL_FLOAT_VEC4: glUniform4f,
+        GL_FLOAT_MAT4: glUniformMatrix4fv,
+        GL_BOOL: glUniform1i,
+        GL_SAMPLER_2D: glUniform1i
+        }
+    
+    _type_maps_wrapper = {
+        GL_BOOL: int,
+        GL_FLOAT_MAT4: lambda X: (1, GL_FALSE, X.tolist()) 
+        }
+    
+    def _uniform_setter_closure(self, name, size, type):
+        handle = glGetUniformLocation(self.handle, name)
+        try:
+            func = self._type_maps_uniform[type]
+        except KeyError:
+            msg = "Setter for %s (type:%d) is not hooked" % (name, type)
+            raise NotImplementedError(msg)
+        try:
+            wrapper = self._type_maps_wrapper[type]
+        except KeyError:
+            wrapper = lambda *x: x
+        def setter(*value):
+            func(handle, *wrapper(value))
+        return setter
+    
+    def _hook_attributes(self):
+        n = glGetProgramiv(self.handle, GL_ACTIVE_ATTRIBUTES)
+        name_length = 30
+        glNameSize = (constants.GLsizei)()
+        glSize = (constants.GLint)()
+        glType = (constants.GLenum)()
+        glName = (constants.GLchar * name_length)()
+        for i in xrange(n):
+            glGetActiveAttrib(
+                    self.handle,
+                    i,
+                    name_length,
+                    glNameSize,
+                    glSize,
+                    glType,
+                    glName)
+            name, size, type = str(glName.value), int(glSize.value), int(glType.value)
+            self._program_var_dict[name] = self._attribute_setter_closure(name, size, type)
+    
+    _type_maps_size = {
+        GL_FLOAT_VEC2: 2,
+        GL_FLOAT_VEC3: 3
+        }
+
+    def _attribute_setter_closure(self, name, size, type):
+        attrib_handle = glGetAttribLocation(self.handle, name)
+        attrib_size = _type_maps_size[type]
+        def setter(buffer_handle):
+            glEnableVertexAttribArray(buffer_handle)
+            glBindBuffer(GL_ARRAY_BUFFER, buffer_handle)
+            glVertexAttribPointer(attrib_handle, attrib_size, type, GL_FALSE, 0, None)
+            pass
+        return setter
+        
+    
+#     # will be called when attribute retrieval failed
+#     def __getattr__(self, name):
+#         try:
+#             self._program_var_dict[name]
+#         except KeyError:
+#             msg = "shader {shader} has no attribute/uniform {name}".format(
+#                         shader=self, name=name)
+#             raise AttributeError(msg)
+#                     
+#         
+#         return object.__setattr__(self, *args, **kwargs)
+    
+    def __setattr__(self, name, val):
+        try:
+            self._set_var(name, val)
+        except KeyError:
+            object.__setattr__(self, *args, **kwargs)
+    
+    def _set_var(self, name, val):
+        setter = self._program_var_dict[name]
+        setter(val)
+        
     
 def _main():
     pass
