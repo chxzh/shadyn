@@ -45,10 +45,6 @@ class Renderer(Thread):
         self.viewport_size = w, h = (640, 480)
         self.window = Window(w*3/2, h*2, "scene")
     
-    
-    class _Camera:
-        pass
-    
     class _Shadow_shader:
         def __init__(self, vert_path, frag_path):
             self.handle = tools.load_program(vert_path, frag_path)
@@ -473,11 +469,15 @@ class Renderer(Thread):
         for item in self._items:
             self.standard_shader.bind(item.model)
             model_view_inv = (self.cam_obs.view_mat * item.model_mat).inverse()
-            glUniformMatrix4fv(self.MVint_loc, 1, GL_TRUE, model_view_inv.toList())
-            glUniformMatrix4fv(self.M_loc, 1, GL_FALSE, item.model_mat.toList())
-            glUniformMatrix4fv(self.V_loc, 1, GL_FALSE, self.cam_obs.view_mat.toList())
+            glUniformMatrix4fv(self.MVint_loc, 1, GL_TRUE, 
+                               model_view_inv.toList())
+            glUniformMatrix4fv(self.M_loc, 1, GL_FALSE, 
+                               item.model_mat.toList())
+            glUniformMatrix4fv(self.V_loc, 1, GL_FALSE, 
+                               self.cam_obs.view_mat.toList())
             MVP = self.cam_obs.proj_mat * self.cam_obs.view_mat * item.model_mat
-            glUniformMatrix4fv(self.MVP_loc, 1, GL_FALSE, MVP.toList())
+            glUniformMatrix4fv(self.MVP_loc, 1, GL_FALSE, 
+                               MVP.toList())
             glUniform3f(self.color_loc, *item.color)
             glDrawElements(GL_TRIANGLES, len(item.model.indices),
                             GL_UNSIGNED_SHORT, None)
