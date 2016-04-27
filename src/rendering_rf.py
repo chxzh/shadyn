@@ -63,7 +63,7 @@ class Renderer(Thread):
         def bind(self, model):
             glBindVertexArray(model.vao_handle)
             glUseProgram(self.handle)
-            self.vert_loc = glGetAttribLocation(self.handle, "coord3d")
+            self.vert_loc = glGetAttribLocation(self.handle, "v_pos")
             glEnableVertexAttribArray(self.vert_loc)
             glBindBuffer(GL_ARRAY_BUFFER, model.v_buffer)
             glVertexAttribPointer(self.vert_loc, 3, GL_FLOAT, GL_FALSE, 0, None)
@@ -193,7 +193,7 @@ class Renderer(Thread):
         self.basic_shader = self._Basic_shader("../shader/basic.v.glsl",
                                                    "../shader/basic.f.glsl")
         glUseProgram(self.basic_shader.handle)
-        self.basic_mvp_loc = glGetUniformLocation(self.basic_shader.handle, "mvp")
+        self.basic_mvp_loc = glGetUniformLocation(self.basic_shader.handle, "MVP")
         basic_mvp = self.cam_obs.proj_mat * self.cam_obs.view_mat * self.light_bulb.model_mat
         glUniformMatrix4fv(self.basic_mvp_loc, 1, GL_FALSE, basic_mvp.toList())
         self.background_indices = range(4) # will use triangle fans

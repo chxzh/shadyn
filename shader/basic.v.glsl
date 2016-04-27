@@ -1,12 +1,8 @@
 #version 330 core
-layout(location = 1) in vec3 coord3d;
+layout(location = 1) in vec3 v_pos;
 
-//attribute vec3 v_color;
-uniform mat4 mvp;
-//out float depth;
+uniform mat4 MVP;
 
 void main(void) {
-  gl_Position = mvp * vec4(coord3d, 1.0);
-  //depth = gl_Position.z;
-  //f_color = v_color;
+  gl_Position = MVP * vec4(v_pos, 1.0);
 }
